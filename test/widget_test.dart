@@ -1,30 +1,77 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'package:drift/drift.dart' hide isNull, isNotNull;
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:drink_water/main.dart';
+import 'package:drink_water/data/app_database.dart';
+import 'package:drink_water/state/app_notifier.dart';
 
+/// 基础冒烟测试：使用内存库构建 AppNotifier，验证数据层与时间轴。
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('AppNotifier 可用内存数据库初始化并装载数据', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    final now = DateTime.now();
+    await db.insertReminder(
+      RemindersCompanion.insert(
+        title: const Value('喝水提醒'),
+        body: const Value('多喝水'),
+        repeatType: repeatDaily,
+        hour: now.hour,
+        minute: now.minute,
+        weekdays: Value(AppDatabase.encodeWeekdays(const [])),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    final notifier = AppNotifier(db: db)..addListener(() {});
+    await notifier.init(schedule: false);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(notifier.reminders.length, 1);
+    expect(notifier.reminders.first.title, '喝水提醒');
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    final timeline = await notifier.todayTimeline();
+    expect(timeline, isNotEmpty);
+
+    // 标记已喝水
+    final id = notifier.reminders.first.id;
+    await notifier.mark(reminderId: id, isDrank: true);
+    final day = await notifier.logsOfDay(toDateString(now));
+    expect(day.length, 1);
+    expect(day.first.isDrank, isTrue);
+
+    await db.close();
   });
+
+  test('recordDrinkNow 记录手动喝水并出现在时间轴与统计', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    final notifier = AppNotifier(db: db)..addListener(() {});
+    await notifier.init(schedule: false);
+
+    await notifier.recordDrinkNow();
+    final now = DateTime.now();
+    final todayStr = toDateString(now);
+
+    final day = await notifier.logsOfDay(todayStr);
+    expect(day.length, 1);
+    expect(day.first.reminderId, isNull); // 手动记录无关联提醒
+    expect(day.first.isDrank, isTrue);
+
+    final timeline = await notifier.todayTimeline();
+    expect(timeline.where((e) => e.manual).length, 1);
+
+    // 统计口径计入
+    final counts = await notifier.drankCountsByDay(
+      DateTime(now.year, now.month, now.day),
+      DateTime(now.year, now.month, now.day + 1),
+    );
+    expect(counts[todayStr], 1);
+
+    await db.close();
+  });
+}
+
+String toDateString(DateTime t) {
+  final m = t.month.toString().padLeft(2, '0');
+  final d = t.day.toString().padLeft(2, '0');
+  return '${t.year}-$m-$d';
 }
