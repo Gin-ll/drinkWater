@@ -1,5 +1,8 @@
 allprojects {
     repositories {
+        // 国内镜像优先，规避 google/mavenCentral 弱网问题
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/central") }
         google()
         mavenCentral()
     }
