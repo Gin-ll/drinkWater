@@ -62,8 +62,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: const Text('主题色'),
               trailing: SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(value: themeColorBlue, label: Text('蓝色'), icon: Icon(Icons.circle, size: 14, color: Color(0xFF2E6BE6))),
-                  ButtonSegment(value: themeColorYellow, label: Text('黄色'), icon: Icon(Icons.circle, size: 14, color: Color(0xFFF6A821))),
+                  ButtonSegment(
+                    value: themeColorBlue,
+                    label: Text('蓝色'),
+                    icon: Icon(Icons.circle, size: 14, color: Color(0xFF3A7BD5)),
+                  ),
+                  ButtonSegment(
+                    value: themeColorGreen,
+                    label: Text('绿色'),
+                    icon: Icon(Icons.circle, size: 14, color: Color(0xFF34A853)),
+                  ),
+                  ButtonSegment(
+                    value: themeColorYellow,
+                    label: Text('黄色'),
+                    icon: Icon(Icons.circle, size: 14, color: Color(0xFFF5A623)),
+                  ),
                 ],
                 selected: {app.themeColor},
                 onSelectionChanged: (s) => app.setThemeColor(s.first),
