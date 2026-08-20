@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 防止资源裁剪移除通知图标：它仅被代码里的字符串名引用，release 下会被当作未使用而裁剪，
+     导致 flutter_local_notifications 初始化报 invalid_icon 崩溃。 -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_drink" />
