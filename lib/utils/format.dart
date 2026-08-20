@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import '../data/app_database.dart';
 
 const weekNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
@@ -43,4 +45,16 @@ String formatDate(DateTime d) => '${d.year}年${d.month}月${d.day}日';
 DateTime parseDate(String s) {
   final parts = s.split('-').map(int.parse).toList();
   return DateTime(parts[0], parts[1], parts[2]);
+}
+
+/// 24 小时制时间选择器：免去手动选择上午/下午
+Future<TimeOfDay?> showTimePicker24(BuildContext context, TimeOfDay initialTime) {
+  return showTimePicker(
+    context: context,
+    initialTime: initialTime,
+    builder: (ctx, child) => MediaQuery(
+      data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+      child: child!,
+    ),
+  );
 }

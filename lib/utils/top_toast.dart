@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-/// 顶部居中轻提示（自动消失），用于「创建/修改成功」等需要醒目但置于顶部的消息。
+/// 顶部居中轻提示（自动消失），置于最顶层（rootOverlay），
+/// 用于「创建/修改成功」等需要醒目但置于顶部的消息。
 void showTopToast(BuildContext context, String message) {
-  final overlay = Overlay.maybeOf(context);
+  // rootOverlay: true —— 置于最顶层，覆盖页面与弹出层
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
   if (overlay == null) return;
   late final OverlayEntry entry;
   entry = OverlayEntry(

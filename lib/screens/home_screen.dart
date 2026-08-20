@@ -505,7 +505,7 @@ class _ManualLogDialogState extends State<_ManualLogDialog> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(context: context, initialTime: _time);
+    final picked = await showTimePicker24(context, _time);
     if (picked != null) setState(() => _time = picked);
   }
 

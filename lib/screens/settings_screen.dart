@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/notification_service.dart';
 import '../state/app_notifier.dart';
 import '../utils/format.dart';
+import '../utils/top_toast.dart';
 import '../theme.dart';
 
 /// 设置（我的）页：主题色 / 免打扰 / 小米适配引导 / 关于
@@ -25,7 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final current = isStart ? app.dndStart : app.dndEnd;
     final parts = current.split(':');
     final initial = TimeOfDay(hour: int.tryParse(parts[0]) ?? 22, minute: int.tryParse(parts[1]) ?? 0);
-    final picked = await showTimePicker(context: context, initialTime: initial);
+    final picked = await showTimePicker24(context, initial);
     if (picked == null) return;
     final value = formatTime(picked.hour, picked.minute);
     await app.setDnd(
@@ -40,9 +41,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await NotificationService.systemChannel.invokeMethod<void>(method);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('无法打开系统设置，请手动前往系统设置操作')),
-        );
+        showTopToast(context, '无法打开系统设置，请手动前往系统设置操作');
       }
     }
   }

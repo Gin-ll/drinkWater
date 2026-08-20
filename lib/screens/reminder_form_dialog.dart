@@ -6,6 +6,7 @@ import '../data/app_database.dart';
 import '../services/occurrence_calculator.dart';
 import '../state/app_notifier.dart';
 import '../utils/format.dart';
+import '../utils/top_toast.dart';
 
 /// 新建 / 修改提醒的弹窗
 ///
@@ -62,7 +63,7 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(context: context, initialTime: _time);
+    final picked = await showTimePicker24(context, _time);
     if (picked != null) setState(() => _time = picked);
   }
 
@@ -123,7 +124,7 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
   }
 
   void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showTopToast(context, msg);
   }
 
   /// 同刻去重提示：若当天该时刻已有启用提醒，弹出「是否仍要添加」确认。
@@ -231,6 +232,13 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
             children: [
               TextField(
                 controller: _title,
+                // 默认「喝水提醒」：点击聚焦时全选，用户输入即替换为自定义内容
+                onTap: () {
+                  if (_title.text == '喝水提醒') {
+                    _title.selection =
+                        TextSelection(baseOffset: 0, extentOffset: _title.text.length);
+                  }
+                },
                 decoration: const InputDecoration(
                   labelText: '标题',
                   hintText: '例如：喝水提醒',
