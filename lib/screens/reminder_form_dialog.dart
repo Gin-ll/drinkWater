@@ -20,7 +20,16 @@ class ReminderFormDialog extends StatefulWidget {
   final String? overriddenOn;
   final TimeOfDay? initialTime;
 
-  const ReminderFormDialog({super.key, this.reminder, this.overriddenOn, this.initialTime});
+  /// 提醒页管理模式：规则级编辑（改未来）+ 未来一个月预览 + 暂停/恢复 + 删除
+  final bool manageMode;
+
+  const ReminderFormDialog({
+    super.key,
+    this.reminder,
+    this.overriddenOn,
+    this.initialTime,
+    this.manageMode = false,
+  });
 
   /// 便捷打开方式：返回是否保存成功
   static Future<bool> show(
@@ -28,6 +37,7 @@ class ReminderFormDialog extends StatefulWidget {
     Reminder? reminder,
     String? overriddenOn,
     TimeOfDay? initialTime,
+    bool manageMode = false,
   }) async {
     final saved = await showDialog<bool>(
       context: context,
@@ -35,6 +45,7 @@ class ReminderFormDialog extends StatefulWidget {
         reminder: reminder,
         overriddenOn: overriddenOn,
         initialTime: initialTime,
+        manageMode: manageMode,
       ),
     );
     return saved ?? false;
@@ -249,9 +260,72 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
     if (mounted) nav.pop(true);
   }
 
+  /// 未来一个月内会提醒的日期（按当前表单设置动态推导，最多 30 天）。
+  List<DateTime> futureMonthPreview() {
+    final now = DateTime.now();
+    final windowEnd = now.add(const Duration(days: 30));
+    if (_repeatType == repeatOnce) {
+      final date = _oneTimeDate;
+      if (date == null) return const [];
+      final t = DateTime(date.year, date.month, date.day, _time.hour, _time.minute);
+      return (t.isAfter(now) && t.isBefore(windowEnd)) ? [t] : const [];
+    }
+    return computeOccurrences(
+      repeatType: _repeatType,
+      hour: _time.hour,
+      minute: _time.minute,
+      weekdays: _weekdays,
+      monthDay: _monthDay,
+      triggerAt: null,
+      windowStart: now,
+      windowEnd: windowEnd,
+      dnd: const DndWindow(enabled: false),
+      now: now,
+    );
+  }
+
+  /// 暂停 / 恢复：暂停=不生成未来实例（不排闹钟、预览为空），恢复继续生成。
+  Future<void> _togglePause() async {
+    final app = context.read<AppNotifier>();
+    await app.toggleEnabled(widget.reminder!.id);
+    if (mounted) setState(() {}); // 刷新开关状态
+  }
+
+  /// 删除规则：保留历史实例与喝水记录（P0-02），按循环/一次性文案确认。
+  Future<void> _deleteRule() async {
+    final r = widget.reminder;
+    if (r == null) return;
+    final app = context.read<AppNotifier>();
+    final isOnce = r.repeatType == repeatOnce;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除提醒'),
+        content: Text(
+          isOnce
+              ? '删除提醒？\n该提醒已经发生，历史记录将保留。\n删除后不会影响已产生的喝水记录。'
+              : '删除后：\n✓ 今天及之前已产生的提醒记录会保留\n✓ 已有的喝水记录不会删除\n✓ 从明天开始不再提醒',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE5484D)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await app.deleteReminder(r.id);
+      if (mounted) Navigator.pop(context, true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFmt = DateFormat('yyyy年M月d日');
+    final isEnabled = widget.reminder?.enabled ?? true;
     return AlertDialog(
       title: Text(
         _isEdit ? '编辑提醒' : '新建提醒',
@@ -354,13 +428,72 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
                   ),
                   onTap: _pickMonthDay,
                 ),
+              // —— 提醒页管理模式附加内容 ——
+              if (widget.manageMode) ...[
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('提醒已开启', style: TextStyle(fontSize: 14)),
+                  subtitle: const Text('暂停后不生成未来提醒，恢复后重新生成',
+                      style: TextStyle(fontSize: 11)),
+                  value: isEnabled,
+                  onChanged: (_) => _togglePause(),
+                ),
+                const SizedBox(height: 8),
+                const Text('未来一个月会提醒：',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const SizedBox(height: 6),
+                _FuturePreview(dates: futureMonthPreview()),
+              ],
             ],
           ),
         ),
       ),
       actions: [
+        if (widget.manageMode && _isEdit)
+          TextButton(
+            onPressed: _deleteRule,
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFFE5484D)),
+            child: const Text('删除'),
+          ),
+        const SizedBox(width: 8),
         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
         FilledButton(onPressed: _save, child: const Text('保存')),
+      ],
+    );
+  }
+}
+
+/// 未来一个月提醒日期小胶囊预览
+class _FuturePreview extends StatelessWidget {
+  final List<DateTime> dates;
+
+  const _FuturePreview({required this.dates});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    if (dates.isEmpty) {
+      return Text('（暂停或已过期，未来 30 天没有提醒）',
+          style: TextStyle(fontSize: 12, color: Colors.grey));
+    }
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final d in dates)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${d.month}/${d.day} ${two(d.hour)}:${two(d.minute)}',
+              style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
+            ),
+          ),
       ],
     );
   }
