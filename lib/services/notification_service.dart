@@ -147,6 +147,7 @@ class NotificationService {
               ? null
               : DateTime.fromMillisecondsSinceEpoch(r.triggerAt!),
           day: today,
+          startOn: r.createdAt, // 新建循环从创建当天起算，创建前不设闹钟
         );
         if (occurrence == null) continue; // 今天不触发 → 不设闹钟
         if (!occurrence.isAfter(now)) continue; // 已错过 → 仅保留数据

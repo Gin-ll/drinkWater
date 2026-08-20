@@ -334,6 +334,49 @@ void main() {
         isNull,
       );
     });
+
+    test('startOn 生效起始日：创建当天及之后才触发，之前不回填', () {
+      final created = DateTime(2026, 8, 20); // 8/20 创建
+      expect(
+        occurrenceOnDay(
+          repeatType: repeatDaily,
+          hour: 9,
+          minute: 0,
+          weekdays: const [],
+          monthDay: null,
+          triggerAt: null,
+          day: DateTime(2026, 8, 21),
+          startOn: created,
+        ),
+        isNotNull,
+      );
+      expect(
+        occurrenceOnDay(
+          repeatType: repeatDaily,
+          hour: 9,
+          minute: 0,
+          weekdays: const [],
+          monthDay: null,
+          triggerAt: null,
+          day: DateTime(2026, 8, 19), // 创建前
+          startOn: created,
+        ),
+        isNull,
+      );
+      expect(
+        occurrenceOnDay(
+          repeatType: repeatDaily,
+          hour: 9,
+          minute: 0,
+          weekdays: const [],
+          monthDay: null,
+          triggerAt: null,
+          day: DateTime(2026, 8, 20), // 创建当天
+          startOn: created,
+        ),
+        isNotNull,
+      );
+    });
   });
 
   group('toDateString / parseDndWindow', () {

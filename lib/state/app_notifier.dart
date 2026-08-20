@@ -168,6 +168,7 @@ class AppNotifier extends ChangeNotifier {
         monthDay: r.monthDay,
         triggerAt: r.triggerAt == null ? null : DateTime.fromMillisecondsSinceEpoch(r.triggerAt!),
         day: dayDate,
+        startOn: r.createdAt, // 新建循环从创建当天起算，之前不回填
       );
       if (time == null) continue;
       entries.add(TodayEntry(

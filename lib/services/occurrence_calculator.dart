@@ -73,9 +73,13 @@ List<DateTime> computeOccurrences({
   required DateTime windowEnd,
   required DndWindow dnd,
   DateTime? now,
+  DateTime? startOn,
 }) {
   final results = <DateTime>[];
   final current = now ?? DateTime.now();
+  final startDate = startOn == null
+      ? null
+      : DateTime(startOn.year, startOn.month, startOn.day);
 
   if (repeatType == repeatOnce) {
     final t = triggerAt;
@@ -83,7 +87,8 @@ List<DateTime> computeOccurrences({
     if (t.isAfter(current) &&
         !t.isBefore(windowStart) &&
         t.isBefore(windowEnd) &&
-        !dnd.contains(t)) {
+        !dnd.contains(t) &&
+        (startDate == null || !DateTime(t.year, t.month, t.day).isBefore(startDate))) {
       results.add(t);
     }
     return results;
@@ -92,6 +97,11 @@ List<DateTime> computeOccurrences({
   // 一次性以外的类型从窗口起始日逐日推进
   var day = DateTime(windowStart.year, windowStart.month, windowStart.day);
   while (day.isBefore(windowEnd)) {
+    // 生效起始日之前（新建循环前）的日子不触发，避免回填创建前的历史
+    if (startDate != null && day.isBefore(startDate)) {
+      day = DateTime(day.year, day.month, day.day + 1);
+      continue;
+    }
     final candidate = DateTime(day.year, day.month, day.day, hour, minute, 0);
     if (candidate.isAfter(current) && candidate.isBefore(windowEnd)) {
       var matches = false;
@@ -127,7 +137,14 @@ DateTime? occurrenceOnDay({
   required int? monthDay,
   required DateTime? triggerAt,
   required DateTime day,
+  DateTime? startOn,
 }) {
+  // 生效起始日之前（新建循环前）的日子不触发，避免回填创建前的历史
+  if (startOn != null) {
+    final startDate = DateTime(startOn.year, startOn.month, startOn.day);
+    final d = DateTime(day.year, day.month, day.day);
+    if (d.isBefore(startDate)) return null;
+  }
   switch (repeatType) {
     case repeatOnce:
       final t = triggerAt;
