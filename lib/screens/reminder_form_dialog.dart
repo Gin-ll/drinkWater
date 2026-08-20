@@ -221,12 +221,6 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
         _toast('每周循环请至少选择一天');
         return;
       }
-      // 提醒时间不能早于当前时间
-      final nowMin = DateTime.now().hour * 60 + DateTime.now().minute;
-      if (_time.hour * 60 + _time.minute < nowMin) {
-        _toast('提醒时间不能早于当前时间');
-        return;
-      }
       // 同刻去重提示
       if (!await _ensureNoTimeConflict(_time.hour, _time.minute)) return;
       if (_isEdit) {
