@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -36,6 +37,14 @@ class DrinkWaterApp extends StatelessWidget {
           return MaterialApp(
             title: '喝水提醒',
             debugShowCheckedModeBanner: false,
+            // 全中文界面：内置组件（日期/时间选择器等）也使用中文
+            locale: const Locale('zh'),
+            supportedLocales: const [Locale('zh'), Locale('en')],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
             theme: buildAppTheme(app.themeColor),
             home: const AppShell(),
           );

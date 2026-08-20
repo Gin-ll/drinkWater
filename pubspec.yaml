@@ -44,7 +44,10 @@ dependencies:
   timezone: ^0.11.1
   flutter_timezone: ^5.1.0
   fl_chart: ^1.2.0
-  intl: ^0.20.3
+  intl: ^0.20.2
+  # 全中文界面：提供 Material 组件（日期/时间选择器等）的中文本地化
+  flutter_localizations:
+    sdk: flutter
 dev_dependencies:
   flutter_test:
     sdk: flutter
