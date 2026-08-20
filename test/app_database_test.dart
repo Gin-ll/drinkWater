@@ -88,6 +88,21 @@ void main() {
       await db.deleteLogsOfReminder(rid);
       expect(await db.logsOfDay('2026-08-19'), isEmpty);
     });
+
+    test('修改记录时间与删除单条记录（手动记录可编辑）', () async {
+      final id = await db.insertDrinkLog(
+        reminderId: null,
+        actionTime: DateTime(2026, 8, 19, 10, 0),
+        occurDate: '2026-08-19',
+        isDrank: true,
+      );
+      await db.updateDrinkLogTime(id, DateTime(2026, 8, 19, 14, 30));
+      final after = (await db.logsOfDay('2026-08-19')).single;
+      expect(after.actionTime, DateTime(2026, 8, 19, 14, 30));
+
+      await db.deleteDrinkLog(id);
+      expect(await db.logsOfDay('2026-08-19'), isEmpty);
+    });
   });
 
   group('统计聚合 drankCountsByDay', () {
