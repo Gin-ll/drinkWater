@@ -69,20 +69,12 @@ void main() {
     await db.close();
   });
 
-  test('首次启动空库自动写入示例提醒，且只写一次', () async {
+  test('首次启动为空库（不再自动写入示例数据）', () async {
     final db = AppDatabase(NativeDatabase.memory());
     final notifier = AppNotifier(db: db)..addListener(() {});
     await notifier.init(schedule: false);
 
-    expect(notifier.reminders.length, 6);
-    expect(await db.getSetting('seeded'), '1');
-    // 示例标题合理
-    expect(notifier.reminders.map((r) => r.title), contains('晨起第一杯'));
-
-    // 二次初始化不再重复写入
-    final n2 = AppNotifier(db: db)..addListener(() {});
-    await n2.init(schedule: false);
-    expect(n2.reminders.length, 6);
+    expect(notifier.reminders, isEmpty);
 
     await db.close();
   });
