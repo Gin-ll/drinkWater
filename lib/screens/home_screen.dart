@@ -107,9 +107,37 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openEdit(Reminder reminder) async {
-    final saved = await ReminderFormDialog.show(context, reminder: reminder);
+  Future<void> _openEdit(Reminder reminder,
+      {String? overriddenOn, TimeOfDay? initialTime}) async {
+    final saved = await ReminderFormDialog.show(
+      context,
+      reminder: reminder,
+      overriddenOn: overriddenOn,
+      initialTime: initialTime,
+    );
     if (saved && mounted) _reload();
+  }
+
+  /// 删除一条手动喝水记录（带确认）。
+  Future<void> _deleteManualLog(TodayEntry entry) async {
+    final log = entry.log;
+    if (log == null) return;
+    final app = context.read<AppNotifier>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除喝水记录'),
+        content: const Text('确定删除这条喝水记录吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await app.deleteDrinkLog(log.id);
+      if (mounted) _reload();
+    }
   }
 
   /// 手动喝水记录可编辑：修改记录时间或删除。
@@ -214,20 +242,43 @@ class _HomeScreenState extends State<HomeScreen> {
                       itemCount: entries.length,
                       itemBuilder: (context, i) {
                         final e = entries[i];
+                        // 点击时间轴信息不打开编辑弹窗（编辑/删除均走左滑）
                         final tile = _TimelineTile(
                           entry: e,
                           occurDate: toDateString(_day),
                           canMark: _isToday, // 仅今天可标记已喝/记录喝水
-                          onTap: () {
-                            if (e.manual) {
-                              _openEditManual(e);
-                            } else {
-                              _openEdit(e.reminder!);
-                            }
-                          },
                         );
-                        // 左滑滑出「编辑/删除」图标操作（手动喝水记录走点按编辑弹窗）
-                        if (e.manual) return tile;
+                        // 手动喝水记录：左滑「编辑(改时间)/删除」
+                        if (e.manual) {
+                          return Slidable(
+                            key: ValueKey(
+                                'manual-${e.time.millisecondsSinceEpoch}'),
+                            endActionPane: ActionPane(
+                              motion: const DrawerMotion(),
+                              extentRatio: 0.3,
+                              children: [
+                                SlidableAction(
+                                  onPressed: (_) => _openEditManual(e),
+                                  backgroundColor: Theme.of(context).colorScheme.primary,
+                                  foregroundColor: Colors.white,
+                                  icon: Icons.edit,
+                                  label: '编辑',
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                SlidableAction(
+                                  onPressed: (_) => _deleteManualLog(e),
+                                  backgroundColor: const Color(0xFFE5484D),
+                                  foregroundColor: Colors.white,
+                                  icon: Icons.delete_outline,
+                                  label: '删除',
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ],
+                            ),
+                            child: tile,
+                          );
+                        }
+                        // 提醒记录：左滑「编辑/删除」；编辑携带当天生效时间与“仅当天”上下文
                         return Slidable(
                           key: ValueKey('tile-${e.reminder!.id}-${e.time.millisecondsSinceEpoch}'),
                           endActionPane: ActionPane(
@@ -235,7 +286,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             extentRatio: 0.3,
                             children: [
                               SlidableAction(
-                                onPressed: (_) => _openEdit(e.reminder!),
+                                onPressed: (_) => _openEdit(
+                                  e.reminder!,
+                                  overriddenOn: toDateString(_day),
+                                  initialTime: TimeOfDay.fromDateTime(e.time),
+                                ),
                                 backgroundColor: Theme.of(context).colorScheme.primary,
                                 foregroundColor: Colors.white,
                                 icon: Icons.edit,
@@ -396,13 +451,11 @@ class _TimelineTile extends StatelessWidget {
   final TodayEntry entry;
   final String occurDate;
   final bool canMark;
-  final VoidCallback? onTap;
 
   const _TimelineTile({
     required this.entry,
     required this.occurDate,
     required this.canMark,
-    this.onTap,
   });
 
   @override
@@ -433,14 +486,12 @@ class _TimelineTile extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+      // 点击时间轴信息不打开编辑弹窗（编辑/删除走左滑）
+      child: IntrinsicHeight(
         // IntrinsicHeight 保证竖直时间线（Column 内的 Expanded）有界，避免 ListView 无界高度报错
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
               SizedBox(
                 width: 56,
                 child: Padding(
@@ -528,7 +579,6 @@ class _TimelineTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
     );
   }
 

@@ -6,6 +6,7 @@ import 'package:drink_water/constants.dart';
 import 'package:drink_water/data/app_database.dart';
 import 'package:drink_water/services/notification_service.dart';
 import 'package:drink_water/services/occurrence_calculator.dart';
+import 'package:drink_water/state/app_notifier.dart';
 import 'package:drink_water/theme.dart';
 
 void main() {
@@ -215,6 +216,54 @@ void main() {
       expect(restored.reminderId, 1);
       expect(restored.occurDate, '2026-08-20');
       expect(reminderMatchWindow, const Duration(minutes: 30));
+    });
+  });
+
+  group('按天临时调整 override', () {
+    test('set/read/clear override，删除提醒连带清理', () async {
+      final rid = await addDailyReminder(hour: 10, minute: 0);
+      expect(await db.overrideFor(rid, '2026-08-20'), isNull);
+
+      await db.setOverride(rid, '2026-08-20', 14, 30);
+      final ov = await db.overrideFor(rid, '2026-08-20');
+      expect(ov, isNotNull);
+      expect(ov!.hour, 14);
+      expect(ov.minute, 30);
+
+      await db.clearOverride(rid, '2026-08-20');
+      expect(await db.overrideFor(rid, '2026-08-20'), isNull);
+
+      // 删除提醒 → overrides 清理
+      await db.setOverride(rid, '2026-08-21', 8, 0);
+      await db.deleteReminder(rid);
+      expect(await db.overrideFor(rid, '2026-08-21'), isNull);
+    });
+
+    test('effectiveOccurrence：override 优先且只影响当天（未来规则不变）', () async {
+      final dbx = AppDatabase(NativeDatabase.memory());
+      final rid = await dbx.insertReminder(
+        RemindersCompanion.insert(
+          title: const Value('每天10点'),
+          repeatType: repeatDaily,
+          hour: 10,
+          minute: 0,
+          weekdays: const Value(''),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      final notifier = AppNotifier(db: dbx);
+      await notifier.init(schedule: false);
+      final r = (await dbx.getReminder(rid))!;
+      expect(await notifier.effectiveOccurrence(r, DateTime(2026, 8, 20)),
+          DateTime(2026, 8, 20, 10, 0));
+      await dbx.setOverride(rid, '2026-08-20', 16, 45);
+      expect(await notifier.effectiveOccurrence(r, DateTime(2026, 8, 20)),
+          DateTime(2026, 8, 20, 16, 45));
+      // 未来/其他日期仍是规则 10:00，不被今天修改影响
+      expect(await notifier.effectiveOccurrence(r, DateTime(2026, 8, 21)),
+          DateTime(2026, 8, 21, 10, 0));
+      await dbx.close();
     });
   });
 

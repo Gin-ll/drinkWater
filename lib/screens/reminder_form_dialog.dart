@@ -11,17 +11,31 @@ import '../utils/top_toast.dart';
 /// 新建 / 修改提醒的弹窗
 ///
 /// - 传入 [reminder] 为修改模式，否则为新建
+/// - [overriddenOn]（YYYY-MM-DD）表示从某天时间轴发起的编辑：默认「仅当天调整」，
+///   改动时间只作用于该日期，不改变未来提醒；关闭开关则永久修改基规则。
+/// - [initialTime] 为发起编辑时该行当天生效的时间（含按天调整）。
 /// - 保存成功会 `Navigator.pop(context, true)`；取消返回 false
 class ReminderFormDialog extends StatefulWidget {
   final Reminder? reminder;
+  final String? overriddenOn;
+  final TimeOfDay? initialTime;
 
-  const ReminderFormDialog({super.key, this.reminder});
+  const ReminderFormDialog({super.key, this.reminder, this.overriddenOn, this.initialTime});
 
   /// 便捷打开方式：返回是否保存成功
-  static Future<bool> show(BuildContext context, {Reminder? reminder}) async {
+  static Future<bool> show(
+    BuildContext context, {
+    Reminder? reminder,
+    String? overriddenOn,
+    TimeOfDay? initialTime,
+  }) async {
     final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => ReminderFormDialog(reminder: reminder),
+      builder: (_) => ReminderFormDialog(
+        reminder: reminder,
+        overriddenOn: overriddenOn,
+        initialTime: initialTime,
+      ),
     );
     return saved ?? false;
   }
@@ -37,6 +51,7 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
   late List<int> _weekdays;
   int? _monthDay;
   DateTime? _oneTimeDate;
+  late bool _onlyThisDay; // 从某天时间轴编辑时默认「仅当天调整」
 
   bool get _isEdit => widget.reminder != null;
 
@@ -47,13 +62,16 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
     // 标题默认「喝水提醒」，不手动修改即为该标题
     _title = TextEditingController(text: r?.title ?? '喝水提醒');
     _repeatType = r?.repeatType ?? repeatDaily;
-    _time = TimeOfDay(hour: r?.hour ?? 8, minute: r?.minute ?? 0);
+    // 发起编辑时的当天生效时间（含按天调整）
+    _time = widget.initialTime ??
+        TimeOfDay(hour: r?.hour ?? 8, minute: r?.minute ?? 0);
     _weekdays = r == null ? [DateTime.now().weekday] : AppDatabase.decodeWeekdays(r.weekdays);
     _monthDay = r?.monthDay ?? DateTime.now().day;
     // 一次性提醒日期默认今天
     _oneTimeDate = (r != null && r.triggerAt != null)
         ? DateTime.fromMillisecondsSinceEpoch(r.triggerAt!)
         : DateTime.now();
+    _onlyThisDay = widget.overriddenOn != null;
   }
 
   @override
@@ -201,10 +219,26 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
       // 同刻去重提示
       if (!await _ensureNoTimeConflict(_time.hour, _time.minute)) return;
       if (_isEdit) {
-        await app.updateReminder(widget.reminder!.id,
-            title: title, body: widget.reminder!.body,
-            repeatType: _repeatType, hour: _time.hour, minute: _time.minute,
-            weekdays: _weekdays, monthDay: _monthDay);
+        final rid = widget.reminder!.id;
+        final baseHour = widget.reminder!.hour;
+        final baseMinute = widget.reminder!.minute;
+        final ov = widget.overriddenOn;
+        if (ov != null && _onlyThisDay) {
+          // 仅当天调整：基规则时间保持不变（未来提醒不变），只写当天的临时时间
+          await app.updateReminder(rid,
+              title: title, body: widget.reminder!.body,
+              repeatType: _repeatType, hour: baseHour, minute: baseMinute,
+              weekdays: _weekdays, monthDay: _monthDay);
+          await app.setDayOverride(rid, ov, _time.hour, _time.minute,
+              baseHour: baseHour, baseMinute: baseMinute);
+        } else {
+          // 永久修改：按新时间更新基规则，并清除该天的临时调整以免互相覆盖
+          await app.updateReminder(rid,
+              title: title, body: widget.reminder!.body,
+              repeatType: _repeatType, hour: _time.hour, minute: _time.minute,
+              weekdays: _weekdays, monthDay: _monthDay);
+          if (ov != null) await app.clearDayOverride(rid, ov);
+        }
       } else {
         await app.addReminder(
             title: title, body: '',
@@ -256,6 +290,16 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
                 selected: {_repeatType},
                 onSelectionChanged: (s) => setState(() => _repeatType = s.first),
               ),
+              if (widget.overriddenOn != null) ...[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('仅当天调整', style: TextStyle(fontSize: 14)),
+                  subtitle: const Text('只改变所选日期，不影响未来提醒', style: TextStyle(fontSize: 11)),
+                  value: _onlyThisDay,
+                  onChanged: (v) => setState(() => _onlyThisDay = v),
+                ),
+              ],
               const SizedBox(height: 8),
               ListTile(
                 contentPadding: EdgeInsets.zero,
