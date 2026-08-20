@@ -160,6 +160,17 @@ class AppDatabase extends _$AppDatabase {
         .go();
   }
 
+  /// 修改一条喝水记录的时间（归属日期发生日期不变，仅更新点按时刻）。
+  Future<void> updateDrinkLogTime(int id, DateTime actionTime) {
+    return (update(drinkLogs)..where((t) => t.id.equals(id)))
+        .write(DrinkLogsCompanion(actionTime: Value(actionTime)));
+  }
+
+  /// 删除一条喝水记录（手动记录或提醒标记均可）。
+  Future<void> deleteDrinkLog(int id) {
+    return (delete(drinkLogs)..where((t) => t.id.equals(id))).go();
+  }
+
   /// 某天的喝水明细（按时间升序）
   Future<List<DrinkLog>> logsOfDay(String occurDate) {
     final q = select(drinkLogs)

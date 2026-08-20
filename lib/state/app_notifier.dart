@@ -210,6 +210,18 @@ class AppNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 编辑手动喝水记录的时间（保持归属日期不变）。
+  Future<void> updateManualLogTime(int logId, DateTime actionTime) async {
+    await db.updateDrinkLogTime(logId, actionTime);
+    notifyListeners();
+  }
+
+  /// 删除一条喝水记录（手动记录或提醒标记均可）。
+  Future<void> deleteDrinkLog(int logId) async {
+    await db.deleteDrinkLog(logId);
+    notifyListeners();
+  }
+
   // ---------- 统计查询 ----------
 
   Future<Map<String, int>> drankCountsByDay(DateTime start, DateTime end) =>
