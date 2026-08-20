@@ -22,20 +22,30 @@ class _HomeScreenState extends State<HomeScreen> {
   late DateTime _day; // 当前查看的日期（仅日期部分）
   Timer? _ticker;
 
+  late final AppNotifier _app;
+
   @override
   void initState() {
     super.initState();
+    _app = context.read<AppNotifier>();
     final now = DateTime.now();
     _day = DateTime(now.year, now.month, now.day);
     _future = _load();
+    // 状态变更（标记已喝、记录喝水、增删改等）时实时刷新时间轴
+    _app.addListener(_onAppChanged);
     // 每分钟刷新状态（待提醒 → 未响应 等时间驱动的状态迁移）
     _ticker = Timer.periodic(const Duration(minutes: 1), (_) => _reload());
   }
 
   @override
   void dispose() {
+    _app.removeListener(_onAppChanged);
     _ticker?.cancel();
     super.dispose();
+  }
+
+  void _onAppChanged() {
+    if (mounted) _reload();
   }
 
   Future<List<TodayEntry>> _load() async {
@@ -96,6 +106,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openEdit(Reminder reminder) async {
     final saved = await ReminderFormDialog.show(context, reminder: reminder);
     if (saved && mounted) _reload();
+  }
+
+  /// 手动喝水记录可编辑：修改记录时间或删除。
+  Future<void> _openEditManual(TodayEntry entry) async {
+    final log = entry.log;
+    if (log == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _ManualLogDialog(log: log),
+    );
+    _reload();
   }
 
   Future<void> _confirmDelete(Reminder r) async {
@@ -164,7 +185,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       return _TimelineTile(
                         entry: e,
                         occurDate: toDateString(_day),
-                        onTap: e.manual ? null : () => _openEdit(e.reminder!),
+                        onTap: () {
+                          if (e.manual) {
+                            _openEditManual(e);
+                          } else {
+                            _openEdit(e.reminder!);
+                          }
+                        },
                         onLongPress: e.manual ? null : () => _confirmDelete(e.reminder!),
                       );
                     },
@@ -292,35 +319,23 @@ class _TimelineTile extends StatelessWidget {
     final now = DateTime.now();
     final time = entry.time;
 
-    // 状态判定
+    // 状态判定（需求二值化）：有「已喝水」记录 → 已喝水；其余一律视为未喝水；未来时刻显示待提醒
+    final drank = entry.log?.isDrank == true;
     String statusText;
     Color statusColor;
     IconData statusIcon;
-    if (entry.log != null) {
-      final drank = entry.log!.isDrank;
-      statusText = drank ? '已喝水' : '未喝水';
-      statusColor = drank ? Colors.green : Colors.orange;
-      statusIcon = drank ? Icons.check_circle : Icons.cancel;
+    if (entry.manual || drank) {
+      statusText = '已喝水';
+      statusColor = Colors.green;
+      statusIcon = Icons.check_circle;
     } else if (time.isAfter(now)) {
-      if (entry.inDnd) {
-        statusText = '免打扰';
-        statusColor = Colors.blueGrey;
-        statusIcon = Icons.nightlight_round;
-      } else {
-        statusText = '待提醒';
-        statusColor = colorScheme.primary;
-        statusIcon = Icons.alarm;
-      }
+      statusText = '待提醒';
+      statusColor = colorScheme.primary;
+      statusIcon = Icons.alarm;
     } else {
-      if (entry.inDnd) {
-        statusText = '已跳过';
-        statusColor = Colors.blueGrey;
-        statusIcon = Icons.nightlight_round;
-      } else {
-        statusText = '未响应';
-        statusColor = Colors.grey;
-        statusIcon = Icons.help_outline;
-      }
+      statusText = '未喝水';
+      statusColor = Colors.orange;
+      statusIcon = Icons.cancel;
     }
 
     return Padding(
@@ -379,21 +394,9 @@ class _TimelineTile extends StatelessWidget {
                               _StatusChip(text: statusText, color: statusColor, icon: statusIcon),
                             ],
                           ),
-                          if (!entry.manual) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              formatRule(entry.reminder!),
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                            if (entry.reminder!.body.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                entry.reminder!.body,
-                                style: const TextStyle(fontSize: 13, color: Colors.black54),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                          // 需求：卡片只保留 标题 + 状态（左侧另有时间）；无副标题行
+                          // 未喝水（含未来待提醒）时才展示唯一动作「已喝」；已喝水/手动记录不展示动作
+                          if (!entry.manual && !drank) ...[
                             const SizedBox(height: 8),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
@@ -405,17 +408,6 @@ class _TimelineTile extends StatelessWidget {
                                   onPressed: () => app.mark(
                                     reminderId: entry.reminder!.id,
                                     isDrank: true,
-                                    occurDate: occurDate,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                _ActionButton(
-                                  label: '未喝',
-                                  icon: Icons.close,
-                                  color: Colors.orange,
-                                  onPressed: () => app.mark(
-                                    reminderId: entry.reminder!.id,
-                                    isDrank: false,
                                     occurDate: occurDate,
                                   ),
                                 ),
@@ -491,6 +483,72 @@ class _ActionButton extends StatelessWidget {
       onPressed: onPressed,
       icon: Icon(icon, size: 14),
       label: Text(label),
+    );
+  }
+}
+
+/// 手动喝水记录的编辑弹窗：可修改记录时间或删除该记录。
+class _ManualLogDialog extends StatefulWidget {
+  final DrinkLog log;
+
+  const _ManualLogDialog({required this.log});
+
+  @override
+  State<_ManualLogDialog> createState() => _ManualLogDialogState();
+}
+
+class _ManualLogDialogState extends State<_ManualLogDialog> {
+  late TimeOfDay _time;
+
+  @override
+  void initState() {
+    super.initState();
+    final t = widget.log.actionTime;
+    _time = TimeOfDay(hour: t.hour, minute: t.minute);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(context: context, initialTime: _time);
+    if (picked != null) setState(() => _time = picked);
+  }
+
+  Future<void> _save() async {
+    final base = widget.log.actionTime;
+    await context.read<AppNotifier>().updateManualLogTime(
+          widget.log.id,
+          DateTime(base.year, base.month, base.day, _time.hour, _time.minute),
+        );
+    if (mounted) Navigator.pop(context);
+  }
+
+  Future<void> _delete() async {
+    await context.read<AppNotifier>().deleteDrinkLog(widget.log.id);
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('喝水记录'),
+      content: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.schedule),
+        title: const Text('记录时间'),
+        trailing: Text(
+          formatTime(_time.hour, _time.minute),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        onTap: _pickTime,
+      ),
+      actions: [
+        TextButton(
+          onPressed: _delete,
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: const Text('删除'),
+        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        FilledButton(onPressed: _save, child: const Text('保存')),
+      ],
     );
   }
 }
