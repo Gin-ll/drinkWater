@@ -49,6 +49,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_slidable: ^4.0.3
+  workmanager: ^0.10.8
 dev_dependencies:
   flutter_test:
     sdk: flutter

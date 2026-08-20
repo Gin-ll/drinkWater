@@ -3,7 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:workmanager/workmanager.dart';
 
+import 'data/app_database.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/stats_screen.dart';
@@ -11,11 +13,44 @@ import 'services/notification_service.dart';
 import 'state/app_notifier.dart';
 import 'theme.dart';
 
+/// 每日重排后台任务：即使不打开 App，也会由系统调度执行，把「今天」的闹钟排上。
+/// 解决「仅当天设闹钟」跨天不打开即不响的问题。
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    debugPrint('[workmanager] 后台任务执行: $task');
+    try {
+      if (task == 'dailyRearm') {
+        await NotificationService.init();
+        final tzInfo = await FlutterTimezone.getLocalTimezone();
+        NotificationService.setLocalLocation(tz.getLocation(tzInfo.identifier));
+        final db = await openAppDatabase();
+        await NotificationService.rescheduleAll(db);
+        await db.close();
+        debugPrint('[workmanager] 当天闹钟已重排完成');
+      }
+    } catch (e) {
+      debugPrint('[workmanager] 重排异常: $e');
+    }
+    return true;
+  });
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.init();
   final timezoneInfo = await FlutterTimezone.getLocalTimezone();
   NotificationService.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
+
+  // 每日自动重排当天闹钟（周期约 24h，规避“不打开 App 则不响”）
+  await Workmanager().initialize(callbackDispatcher);
+  await Workmanager().registerPeriodicTask(
+    'dailyRearm',
+    'dailyRearm',
+    frequency: const Duration(hours: 24),
+    initialDelay: const Duration(hours: 2),
+    constraints: Constraints(networkType: NetworkType.notRequired),
+  );
 
   final notifier = AppNotifier();
   await notifier.init();
