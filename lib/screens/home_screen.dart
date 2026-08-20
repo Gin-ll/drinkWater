@@ -185,6 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         final tile = _TimelineTile(
                           entry: e,
                           occurDate: toDateString(_day),
+                          canMark: _isToday, // 仅今天可标记已喝/记录喝水
                           onTap: () {
                             if (e.manual) {
                               _openEditManual(e);
@@ -329,11 +330,13 @@ class _EmptyState extends StatelessWidget {
 class _TimelineTile extends StatelessWidget {
   final TodayEntry entry;
   final String occurDate;
+  final bool canMark;
   final VoidCallback? onTap;
 
   const _TimelineTile({
     required this.entry,
     required this.occurDate,
+    required this.canMark,
     this.onTap,
   });
 
@@ -419,18 +422,24 @@ class _TimelineTile extends StatelessWidget {
                             ],
                           ),
                           // 需求：卡片只保留 标题 + 状态（左侧另有时间）；无副标题行
-                          // 未喝水（含未来待提醒）时展示一个「已喝」图标；已喝水/手动记录不展示
+                          // 未喝水（含未来待提醒）时展示一个「已喝」图标；仅今天可标记，其他日期点击仅提示不改状态
                           if (!entry.manual && !drank) ...[
                             Align(
                               alignment: Alignment.centerRight,
                               child: IconButton(
                                 tooltip: '标记已喝',
                                 iconSize: 28,
-                                onPressed: () => app.mark(
-                                  reminderId: entry.reminder!.id,
-                                  isDrank: true,
-                                  occurDate: occurDate,
-                                ),
+                                onPressed: () {
+                                  if (canMark) {
+                                    app.mark(
+                                      reminderId: entry.reminder!.id,
+                                      isDrank: true,
+                                      occurDate: occurDate,
+                                    );
+                                  } else {
+                                    showTopToast(context, '仅今天可标记已喝');
+                                  }
+                                },
                                 // 杯中有水的图标，颜色跟随主题
                                 icon: Icon(Icons.local_drink, color: colorScheme.primary),
                               ),

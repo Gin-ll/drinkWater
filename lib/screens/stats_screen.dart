@@ -2,7 +2,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../data/app_database.dart';
 import '../services/occurrence_calculator.dart';
 import '../state/app_notifier.dart';
 import '../utils/format.dart';
@@ -20,6 +19,7 @@ enum _RangeMode { week, month }
 enum _ChartKind { bar, line }
 
 class _StatsScreenState extends State<StatsScreen> {
+  late final AppNotifier _app;
   _RangeMode _mode = _RangeMode.week; // 默认本周
   _ChartKind _chart = _ChartKind.bar;
   DateTime _anchor = DateTime.now(); // 周=该周任一日期 / 月=某月
@@ -29,7 +29,20 @@ class _StatsScreenState extends State<StatsScreen> {
   @override
   void initState() {
     super.initState();
+    _app = context.read<AppNotifier>();
+    // 标记已喝/记录喝水等数据变化时，实时刷新统计
+    _app.addListener(_onAppChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _app.removeListener(_onAppChanged);
+    super.dispose();
+  }
+
+  void _onAppChanged() {
+    if (mounted) _load();
   }
 
   /// 当前统计区间（开区间 end 为区间后一天）
@@ -96,11 +109,12 @@ class _StatsScreenState extends State<StatsScreen> {
 
   Future<void> _showDayDetail(String date) async {
     final app = context.read<AppNotifier>();
-    final logs = await app.logsOfDay(date);
+    final day = parseDate(date);
+    final entries = await app.timelineFor(day);
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => _DayDetailSheet(date: date, logs: logs),
+      builder: (ctx) => _DayDetailSheet(date: date, entries: entries),
     );
   }
 
@@ -605,13 +619,14 @@ class _CalendarCard extends StatelessWidget {
 
 class _DayDetailSheet extends StatelessWidget {
   final String date;
-  final List<DrinkLog> logs;
+  final List<TodayEntry> entries;
 
-  const _DayDetailSheet({required this.date, required this.logs});
+  const _DayDetailSheet({required this.date, required this.entries});
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...logs]..sort((a, b) => a.actionTime.compareTo(b.actionTime));
+    final now = DateTime.now();
+    final colorScheme = Theme.of(context).colorScheme;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -621,24 +636,70 @@ class _DayDetailSheet extends StatelessWidget {
           children: [
             Text(formatDate(parseDate(date)),
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            if (sorted.isEmpty)
+            const SizedBox(height: 8),
+            if (entries.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: Text('当天没有喝水记录', style: TextStyle(color: Colors.grey))),
+                child: Center(child: Text('当天暂无喝水信息', style: TextStyle(color: Colors.grey))),
               )
             else
-              ...sorted.map((log) {
-                final t = log.actionTime;
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(log.isDrank ? Icons.local_drink : Icons.close,
-                      color: Theme.of(context).colorScheme.primary),
-                  title: Text(log.isDrank ? '已喝水' : '未喝水'),
-                  subtitle: Text('${formatTime(t.hour, t.minute)} 记录'),
-                  trailing: log.reminderId == null
-                      ? null
-                      : Text('提醒#${log.reminderId}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              ...entries.map((e) {
+                final drank = e.log?.isDrank == true;
+                final title = e.manual ? '喝水记录' : e.reminder!.title;
+                // 状态：已喝水 / 待提醒 / 未喝水
+                final (statusText, statusColor) = (e.manual || drank)
+                    ? ('已喝水', Colors.green)
+                    : (e.time.isAfter(now)
+                        ? ('待提醒', colorScheme.primary)
+                        : ('未喝水', Colors.orange));
+                final recorded = e.log;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 第一行：标题(左) + 状态(右)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(title,
+                                style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(statusText,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: statusColor,
+                                    fontWeight: FontWeight.w600)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      // 第二行：设置喝水时间(左) + 记录喝水时间(右)
+                      Row(
+                        children: [
+                          Text(
+                            '设置喝水时间  ${formatTime(e.time.hour, e.time.minute)}',
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '记录喝水时间  ${recorded == null ? '-' : formatTime(recorded.actionTime.hour, recorded.actionTime.minute)}',
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 );
               }),
           ],
