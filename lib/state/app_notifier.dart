@@ -160,8 +160,47 @@ class AppNotifier extends ChangeNotifier {
   }
 
   Future<void> deleteReminder(int id) async {
-    // P0-02：删除提醒只删未来提醒配置，不删历史喝水记录，统计保持不变
+    // P0-02：删除提醒只删未来提醒配置（含按天调整），不删历史喝水记录，统计保持不变
     await db.deleteReminder(id);
+    await refresh();
+    await NotificationService.rescheduleAll(db);
+  }
+
+  // ---------- 按天临时调整（override） ----------
+
+  /// 某提醒在某天的「生效时间」：若该天有按天调整则用之，否则用规则时间。
+  Future<DateTime?> effectiveOccurrence(Reminder r, DateTime day) async {
+    final dayDate = DateTime(day.year, day.month, day.day);
+    final base = occurrenceOnDay(
+      repeatType: r.repeatType,
+      hour: r.hour,
+      minute: r.minute,
+      weekdays: AppDatabase.decodeWeekdays(r.weekdays),
+      monthDay: r.monthDay,
+      triggerAt: r.triggerAt == null ? null : DateTime.fromMillisecondsSinceEpoch(r.triggerAt!),
+      day: dayDate,
+      startOn: r.createdAt,
+    );
+    if (base == null) return null;
+    final ov = await db.overrideFor(r.id, toDateString(dayDate));
+    if (ov == null) return base;
+    return DateTime(dayDate.year, dayDate.month, dayDate.day, ov.hour, ov.minute);
+  }
+
+  /// 仅调整某一天（不改未来规则）。时间与规则一致时等价于清除调整。
+  Future<void> setDayOverride(int reminderId, String date, int hour, int minute,
+      {int? baseHour, int? baseMinute}) async {
+    if (baseHour != null && baseMinute != null && hour == baseHour && minute == baseMinute) {
+      await db.clearOverride(reminderId, date);
+    } else {
+      await db.setOverride(reminderId, date, hour, minute);
+    }
+    await refresh();
+    await NotificationService.rescheduleAll(db);
+  }
+
+  Future<void> clearDayOverride(int reminderId, String date) async {
+    await db.clearOverride(reminderId, date);
     await refresh();
     await NotificationService.rescheduleAll(db);
   }
@@ -206,16 +245,8 @@ class AppNotifier extends ChangeNotifier {
 
     for (final r in reminders) {
       if (!r.enabled) continue;
-      final time = occurrenceOnDay(
-        repeatType: r.repeatType,
-        hour: r.hour,
-        minute: r.minute,
-        weekdays: AppDatabase.decodeWeekdays(r.weekdays),
-        monthDay: r.monthDay,
-        triggerAt: r.triggerAt == null ? null : DateTime.fromMillisecondsSinceEpoch(r.triggerAt!),
-        day: dayDate,
-        startOn: r.createdAt, // 新建循环从创建当天起算，之前不回填
-      );
+      // 按天生效时间：优先按天临时调整（override），否则用规则时间
+      final time = await effectiveOccurrence(r, dayDate);
       if (time == null) continue;
 
       // 该提醒自己对应的 DrinkLog（存在 → 已喝水）

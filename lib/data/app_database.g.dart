@@ -1259,12 +1259,341 @@ class SettingsTableCompanion extends UpdateCompanion<SettingsTableData> {
   }
 }
 
+class $ReminderOverridesTable extends ReminderOverrides
+    with TableInfo<$ReminderOverridesTable, ReminderOverride> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ReminderOverridesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _reminderIdMeta = const VerificationMeta(
+    'reminderId',
+  );
+  @override
+  late final GeneratedColumn<int> reminderId = GeneratedColumn<int>(
+    'reminder_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES reminders (id)',
+    ),
+  );
+  static const VerificationMeta _overriddenOnMeta = const VerificationMeta(
+    'overriddenOn',
+  );
+  @override
+  late final GeneratedColumn<String> overriddenOn = GeneratedColumn<String>(
+    'overridden_on',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hourMeta = const VerificationMeta('hour');
+  @override
+  late final GeneratedColumn<int> hour = GeneratedColumn<int>(
+    'hour',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _minuteMeta = const VerificationMeta('minute');
+  @override
+  late final GeneratedColumn<int> minute = GeneratedColumn<int>(
+    'minute',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    reminderId,
+    overriddenOn,
+    hour,
+    minute,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'reminder_overrides';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ReminderOverride> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('reminder_id')) {
+      context.handle(
+        _reminderIdMeta,
+        reminderId.isAcceptableOrUnknown(data['reminder_id']!, _reminderIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reminderIdMeta);
+    }
+    if (data.containsKey('overridden_on')) {
+      context.handle(
+        _overriddenOnMeta,
+        overriddenOn.isAcceptableOrUnknown(
+          data['overridden_on']!,
+          _overriddenOnMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_overriddenOnMeta);
+    }
+    if (data.containsKey('hour')) {
+      context.handle(
+        _hourMeta,
+        hour.isAcceptableOrUnknown(data['hour']!, _hourMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_hourMeta);
+    }
+    if (data.containsKey('minute')) {
+      context.handle(
+        _minuteMeta,
+        minute.isAcceptableOrUnknown(data['minute']!, _minuteMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_minuteMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {reminderId, overriddenOn};
+  @override
+  ReminderOverride map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReminderOverride(
+      reminderId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reminder_id'],
+      )!,
+      overriddenOn: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}overridden_on'],
+      )!,
+      hour: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hour'],
+      )!,
+      minute: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}minute'],
+      )!,
+    );
+  }
+
+  @override
+  $ReminderOverridesTable createAlias(String alias) {
+    return $ReminderOverridesTable(attachedDatabase, alias);
+  }
+}
+
+class ReminderOverride extends DataClass
+    implements Insertable<ReminderOverride> {
+  final int reminderId;
+  final String overriddenOn;
+  final int hour;
+  final int minute;
+  const ReminderOverride({
+    required this.reminderId,
+    required this.overriddenOn,
+    required this.hour,
+    required this.minute,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['reminder_id'] = Variable<int>(reminderId);
+    map['overridden_on'] = Variable<String>(overriddenOn);
+    map['hour'] = Variable<int>(hour);
+    map['minute'] = Variable<int>(minute);
+    return map;
+  }
+
+  ReminderOverridesCompanion toCompanion(bool nullToAbsent) {
+    return ReminderOverridesCompanion(
+      reminderId: Value(reminderId),
+      overriddenOn: Value(overriddenOn),
+      hour: Value(hour),
+      minute: Value(minute),
+    );
+  }
+
+  factory ReminderOverride.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReminderOverride(
+      reminderId: serializer.fromJson<int>(json['reminderId']),
+      overriddenOn: serializer.fromJson<String>(json['overriddenOn']),
+      hour: serializer.fromJson<int>(json['hour']),
+      minute: serializer.fromJson<int>(json['minute']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'reminderId': serializer.toJson<int>(reminderId),
+      'overriddenOn': serializer.toJson<String>(overriddenOn),
+      'hour': serializer.toJson<int>(hour),
+      'minute': serializer.toJson<int>(minute),
+    };
+  }
+
+  ReminderOverride copyWith({
+    int? reminderId,
+    String? overriddenOn,
+    int? hour,
+    int? minute,
+  }) => ReminderOverride(
+    reminderId: reminderId ?? this.reminderId,
+    overriddenOn: overriddenOn ?? this.overriddenOn,
+    hour: hour ?? this.hour,
+    minute: minute ?? this.minute,
+  );
+  ReminderOverride copyWithCompanion(ReminderOverridesCompanion data) {
+    return ReminderOverride(
+      reminderId: data.reminderId.present
+          ? data.reminderId.value
+          : this.reminderId,
+      overriddenOn: data.overriddenOn.present
+          ? data.overriddenOn.value
+          : this.overriddenOn,
+      hour: data.hour.present ? data.hour.value : this.hour,
+      minute: data.minute.present ? data.minute.value : this.minute,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReminderOverride(')
+          ..write('reminderId: $reminderId, ')
+          ..write('overriddenOn: $overriddenOn, ')
+          ..write('hour: $hour, ')
+          ..write('minute: $minute')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(reminderId, overriddenOn, hour, minute);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReminderOverride &&
+          other.reminderId == this.reminderId &&
+          other.overriddenOn == this.overriddenOn &&
+          other.hour == this.hour &&
+          other.minute == this.minute);
+}
+
+class ReminderOverridesCompanion extends UpdateCompanion<ReminderOverride> {
+  final Value<int> reminderId;
+  final Value<String> overriddenOn;
+  final Value<int> hour;
+  final Value<int> minute;
+  final Value<int> rowid;
+  const ReminderOverridesCompanion({
+    this.reminderId = const Value.absent(),
+    this.overriddenOn = const Value.absent(),
+    this.hour = const Value.absent(),
+    this.minute = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ReminderOverridesCompanion.insert({
+    required int reminderId,
+    required String overriddenOn,
+    required int hour,
+    required int minute,
+    this.rowid = const Value.absent(),
+  }) : reminderId = Value(reminderId),
+       overriddenOn = Value(overriddenOn),
+       hour = Value(hour),
+       minute = Value(minute);
+  static Insertable<ReminderOverride> custom({
+    Expression<int>? reminderId,
+    Expression<String>? overriddenOn,
+    Expression<int>? hour,
+    Expression<int>? minute,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (reminderId != null) 'reminder_id': reminderId,
+      if (overriddenOn != null) 'overridden_on': overriddenOn,
+      if (hour != null) 'hour': hour,
+      if (minute != null) 'minute': minute,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ReminderOverridesCompanion copyWith({
+    Value<int>? reminderId,
+    Value<String>? overriddenOn,
+    Value<int>? hour,
+    Value<int>? minute,
+    Value<int>? rowid,
+  }) {
+    return ReminderOverridesCompanion(
+      reminderId: reminderId ?? this.reminderId,
+      overriddenOn: overriddenOn ?? this.overriddenOn,
+      hour: hour ?? this.hour,
+      minute: minute ?? this.minute,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (reminderId.present) {
+      map['reminder_id'] = Variable<int>(reminderId.value);
+    }
+    if (overriddenOn.present) {
+      map['overridden_on'] = Variable<String>(overriddenOn.value);
+    }
+    if (hour.present) {
+      map['hour'] = Variable<int>(hour.value);
+    }
+    if (minute.present) {
+      map['minute'] = Variable<int>(minute.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReminderOverridesCompanion(')
+          ..write('reminderId: $reminderId, ')
+          ..write('overriddenOn: $overriddenOn, ')
+          ..write('hour: $hour, ')
+          ..write('minute: $minute, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $RemindersTable reminders = $RemindersTable(this);
   late final $DrinkLogsTable drinkLogs = $DrinkLogsTable(this);
   late final $SettingsTableTable settingsTable = $SettingsTableTable(this);
+  late final $ReminderOverridesTable reminderOverrides =
+      $ReminderOverridesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1273,6 +1602,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     reminders,
     drinkLogs,
     settingsTable,
+    reminderOverrides,
   ];
 }
 
@@ -1324,6 +1654,27 @@ final class $$RemindersTableReferences
     ).filter((f) => f.reminderId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_drinkLogsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$ReminderOverridesTable, List<ReminderOverride>>
+  _reminderOverridesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.reminderOverrides,
+        aliasName: 'reminders__id__reminder_overrides__reminder_id',
+      );
+
+  $$ReminderOverridesTableProcessedTableManager get reminderOverridesRefs {
+    final manager = $$ReminderOverridesTableTableManager(
+      $_db,
+      $_db.reminderOverrides,
+    ).filter((f) => f.reminderId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _reminderOverridesRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -1415,6 +1766,31 @@ class $$RemindersTableFilterComposer
           }) => $$DrinkLogsTableFilterComposer(
             $db: $db,
             $table: $db.drinkLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> reminderOverridesRefs(
+    Expression<bool> Function($$ReminderOverridesTableFilterComposer f) f,
+  ) {
+    final $$ReminderOverridesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.reminderOverrides,
+      getReferencedColumn: (t) => t.reminderId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ReminderOverridesTableFilterComposer(
+            $db: $db,
+            $table: $db.reminderOverrides,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1566,6 +1942,32 @@ class $$RemindersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> reminderOverridesRefs<T extends Object>(
+    Expression<T> Function($$ReminderOverridesTableAnnotationComposer a) f,
+  ) {
+    final $$ReminderOverridesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.reminderOverrides,
+          getReferencedColumn: (t) => t.reminderId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ReminderOverridesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.reminderOverrides,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$RemindersTableTableManager
@@ -1581,7 +1983,10 @@ class $$RemindersTableTableManager
           $$RemindersTableUpdateCompanionBuilder,
           (Reminder, $$RemindersTableReferences),
           Reminder,
-          PrefetchHooks Function({bool drinkLogsRefs})
+          PrefetchHooks Function({
+            bool drinkLogsRefs,
+            bool reminderOverridesRefs,
+          })
         > {
   $$RemindersTableTableManager(_$AppDatabase db, $RemindersTable table)
     : super(
@@ -1658,36 +2063,63 @@ class $$RemindersTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({drinkLogsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (drinkLogsRefs) db.drinkLogs],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (drinkLogsRefs)
-                    await $_getPrefetchedData<
-                      Reminder,
-                      $RemindersTable,
-                      DrinkLog
-                    >(
-                      currentTable: table,
-                      referencedTable: $$RemindersTableReferences
-                          ._drinkLogsRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$RemindersTableReferences(
-                            db,
-                            table,
-                            p0,
-                          ).drinkLogsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.reminderId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({drinkLogsRefs = false, reminderOverridesRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (drinkLogsRefs) db.drinkLogs,
+                    if (reminderOverridesRefs) db.reminderOverrides,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (drinkLogsRefs)
+                        await $_getPrefetchedData<
+                          Reminder,
+                          $RemindersTable,
+                          DrinkLog
+                        >(
+                          currentTable: table,
+                          referencedTable: $$RemindersTableReferences
+                              ._drinkLogsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$RemindersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).drinkLogsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.reminderId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (reminderOverridesRefs)
+                        await $_getPrefetchedData<
+                          Reminder,
+                          $RemindersTable,
+                          ReminderOverride
+                        >(
+                          currentTable: table,
+                          referencedTable: $$RemindersTableReferences
+                              ._reminderOverridesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$RemindersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).reminderOverridesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.reminderId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -1704,7 +2136,7 @@ typedef $$RemindersTableProcessedTableManager =
       $$RemindersTableUpdateCompanionBuilder,
       (Reminder, $$RemindersTableReferences),
       Reminder,
-      PrefetchHooks Function({bool drinkLogsRefs})
+      PrefetchHooks Function({bool drinkLogsRefs, bool reminderOverridesRefs})
     >;
 typedef $$DrinkLogsTableCreateCompanionBuilder =
     DrinkLogsCompanion Function({
@@ -2163,6 +2595,322 @@ typedef $$SettingsTableTableProcessedTableManager =
       SettingsTableData,
       PrefetchHooks Function()
     >;
+typedef $$ReminderOverridesTableCreateCompanionBuilder =
+    ReminderOverridesCompanion Function({
+      required int reminderId,
+      required String overriddenOn,
+      required int hour,
+      required int minute,
+      Value<int> rowid,
+    });
+typedef $$ReminderOverridesTableUpdateCompanionBuilder =
+    ReminderOverridesCompanion Function({
+      Value<int> reminderId,
+      Value<String> overriddenOn,
+      Value<int> hour,
+      Value<int> minute,
+      Value<int> rowid,
+    });
+
+final class $$ReminderOverridesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $ReminderOverridesTable,
+          ReminderOverride
+        > {
+  $$ReminderOverridesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $RemindersTable _reminderIdTable(_$AppDatabase db) => db.reminders
+      .createAlias('reminder_overrides__reminder_id__reminders__id');
+
+  $$RemindersTableProcessedTableManager get reminderId {
+    final $_column = $_itemColumn<int>('reminder_id')!;
+
+    final manager = $$RemindersTableTableManager(
+      $_db,
+      $_db.reminders,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_reminderIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ReminderOverridesTableFilterComposer
+    extends Composer<_$AppDatabase, $ReminderOverridesTable> {
+  $$ReminderOverridesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get overriddenOn => $composableBuilder(
+    column: $table.overriddenOn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hour => $composableBuilder(
+    column: $table.hour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get minute => $composableBuilder(
+    column: $table.minute,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$RemindersTableFilterComposer get reminderId {
+    final $$RemindersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.reminderId,
+      referencedTable: $db.reminders,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RemindersTableFilterComposer(
+            $db: $db,
+            $table: $db.reminders,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ReminderOverridesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ReminderOverridesTable> {
+  $$ReminderOverridesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get overriddenOn => $composableBuilder(
+    column: $table.overriddenOn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hour => $composableBuilder(
+    column: $table.hour,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get minute => $composableBuilder(
+    column: $table.minute,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$RemindersTableOrderingComposer get reminderId {
+    final $$RemindersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.reminderId,
+      referencedTable: $db.reminders,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RemindersTableOrderingComposer(
+            $db: $db,
+            $table: $db.reminders,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ReminderOverridesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ReminderOverridesTable> {
+  $$ReminderOverridesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get overriddenOn => $composableBuilder(
+    column: $table.overriddenOn,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get hour =>
+      $composableBuilder(column: $table.hour, builder: (column) => column);
+
+  GeneratedColumn<int> get minute =>
+      $composableBuilder(column: $table.minute, builder: (column) => column);
+
+  $$RemindersTableAnnotationComposer get reminderId {
+    final $$RemindersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.reminderId,
+      referencedTable: $db.reminders,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$RemindersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.reminders,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ReminderOverridesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ReminderOverridesTable,
+          ReminderOverride,
+          $$ReminderOverridesTableFilterComposer,
+          $$ReminderOverridesTableOrderingComposer,
+          $$ReminderOverridesTableAnnotationComposer,
+          $$ReminderOverridesTableCreateCompanionBuilder,
+          $$ReminderOverridesTableUpdateCompanionBuilder,
+          (ReminderOverride, $$ReminderOverridesTableReferences),
+          ReminderOverride,
+          PrefetchHooks Function({bool reminderId})
+        > {
+  $$ReminderOverridesTableTableManager(
+    _$AppDatabase db,
+    $ReminderOverridesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ReminderOverridesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ReminderOverridesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ReminderOverridesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> reminderId = const Value.absent(),
+                Value<String> overriddenOn = const Value.absent(),
+                Value<int> hour = const Value.absent(),
+                Value<int> minute = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ReminderOverridesCompanion(
+                reminderId: reminderId,
+                overriddenOn: overriddenOn,
+                hour: hour,
+                minute: minute,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required int reminderId,
+                required String overriddenOn,
+                required int hour,
+                required int minute,
+                Value<int> rowid = const Value.absent(),
+              }) => ReminderOverridesCompanion.insert(
+                reminderId: reminderId,
+                overriddenOn: overriddenOn,
+                hour: hour,
+                minute: minute,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ReminderOverridesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({reminderId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (reminderId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.reminderId,
+                                referencedTable:
+                                    $$ReminderOverridesTableReferences
+                                        ._reminderIdTable(db),
+                                referencedColumn:
+                                    $$ReminderOverridesTableReferences
+                                        ._reminderIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ReminderOverridesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ReminderOverridesTable,
+      ReminderOverride,
+      $$ReminderOverridesTableFilterComposer,
+      $$ReminderOverridesTableOrderingComposer,
+      $$ReminderOverridesTableAnnotationComposer,
+      $$ReminderOverridesTableCreateCompanionBuilder,
+      $$ReminderOverridesTableUpdateCompanionBuilder,
+      (ReminderOverride, $$ReminderOverridesTableReferences),
+      ReminderOverride,
+      PrefetchHooks Function({bool reminderId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2173,4 +2921,6 @@ class $AppDatabaseManager {
       $$DrinkLogsTableTableManager(_db, _db.drinkLogs);
   $$SettingsTableTableTableManager get settingsTable =>
       $$SettingsTableTableTableManager(_db, _db.settingsTable);
+  $$ReminderOverridesTableTableManager get reminderOverrides =>
+      $$ReminderOverridesTableTableManager(_db, _db.reminderOverrides);
 }

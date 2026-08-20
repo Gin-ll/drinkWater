@@ -158,10 +158,16 @@ class NotificationService {
           startOn: r.createdAt, // 新建循环从创建当天起算，创建前不设闹钟
         );
         if (occurrence == null) continue; // 今天不触发 → 不设闹钟
-        if (!occurrence.isAfter(now)) continue; // 已错过 → 仅保留数据
-        if (dnd.contains(occurrence)) continue; // 免打扰内 → 完全跳过
+        // 按天临时调整：今天有 override 则用其时间
+        var at = occurrence;
+        final ov = await db.overrideFor(r.id, toDateString(today));
+        if (ov != null) {
+          at = DateTime(today.year, today.month, today.day, ov.hour, ov.minute);
+        }
+        if (!at.isAfter(now)) continue; // 已错过 → 仅保留数据
+        if (dnd.contains(at)) continue; // 免打扰内 → 完全跳过
 
-        await _schedule(_idFor(r.id, 0), r, occurrence, dbPath);
+        await _schedule(_idFor(r.id, 0), r, at, dbPath);
       }
     } catch (e) {
       debugPrint('[notify] rescheduleAll 异常（已忽略，避免中断业务）: $e');

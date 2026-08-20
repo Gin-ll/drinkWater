@@ -52,6 +52,17 @@ class SettingsTable extends Table {
   Set<Column> get primaryKey => {key};
 }
 
+/// 按天临时调整提醒时间（如“今天 10:00 改到 14:00”），只作用于该日期，不影响未来规则。
+class ReminderOverrides extends Table {
+  IntColumn get reminderId => integer().references(Reminders, #id)();
+  TextColumn get overriddenOn => text()(); // YYYY-MM-DD
+  IntColumn get hour => integer()();
+  IntColumn get minute => integer()();
+
+  @override
+  Set<Column> get primaryKey => {reminderId, overriddenOn};
+}
+
 /// 每日喝水次数聚合结果
 class DailyDrinkCount {
   final String date;
@@ -60,12 +71,23 @@ class DailyDrinkCount {
   DailyDrinkCount(this.date, this.count);
 }
 
-@DriftDatabase(tables: [Reminders, DrinkLogs, SettingsTable])
+@DriftDatabase(tables: [Reminders, DrinkLogs, SettingsTable, ReminderOverrides])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            // 新增「按天临时调整」表
+            await m.createTable(reminderOverrides);
+          }
+        },
+      );
 
   // ---------- 提醒 ----------
 
@@ -91,8 +113,43 @@ class AppDatabase extends _$AppDatabase {
     return update(reminders).replace(entry);
   }
 
-  Future<void> deleteReminder(int id) {
-    return (delete(reminders)..where((t) => t.id.equals(id))).go();
+  Future<void> deleteReminder(int id) async {
+    // 删除提醒：清理其按天调整（不删历史喝水记录，P0-02）
+    await (delete(reminderOverrides)..where((t) => t.reminderId.equals(id))).go();
+    await (delete(reminders)..where((t) => t.id.equals(id))).go();
+  }
+
+  // ---------- 按天临时调整（override） ----------
+
+  Future<ReminderOverride?> overrideFor(int reminderId, String date) {
+    final q = (select(reminderOverrides)
+          ..where((t) => t.reminderId.equals(reminderId) & t.overriddenOn.equals(date)))
+        .getSingleOrNull();
+    return q;
+  }
+
+  Future<void> setOverride(int reminderId, String date, int hour, int minute) {
+    return into(reminderOverrides).insertOnConflictUpdate(
+      ReminderOverridesCompanion.insert(
+        reminderId: reminderId,
+        overriddenOn: date,
+        hour: hour,
+        minute: minute,
+      ),
+    );
+  }
+
+  Future<void> clearOverride(int reminderId, String date) {
+    return (delete(reminderOverrides)
+          ..where(
+              (t) => t.reminderId.equals(reminderId) & t.overriddenOn.equals(date)))
+        .go();
+  }
+
+  Future<void> deleteOverridesOfReminder(int reminderId) {
+    return (delete(reminderOverrides)
+          ..where((t) => t.reminderId.equals(reminderId)))
+        .go();
   }
 
   /// 将周几数组编码为 JSON 文本
