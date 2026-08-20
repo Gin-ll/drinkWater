@@ -260,30 +260,6 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
     if (mounted) nav.pop(true);
   }
 
-  /// 未来一个月内会提醒的日期（按当前表单设置动态推导，最多 30 天）。
-  List<DateTime> futureMonthPreview() {
-    final now = DateTime.now();
-    final windowEnd = now.add(const Duration(days: 30));
-    if (_repeatType == repeatOnce) {
-      final date = _oneTimeDate;
-      if (date == null) return const [];
-      final t = DateTime(date.year, date.month, date.day, _time.hour, _time.minute);
-      return (t.isAfter(now) && t.isBefore(windowEnd)) ? [t] : const [];
-    }
-    return computeOccurrences(
-      repeatType: _repeatType,
-      hour: _time.hour,
-      minute: _time.minute,
-      weekdays: _weekdays,
-      monthDay: _monthDay,
-      triggerAt: null,
-      windowStart: now,
-      windowEnd: windowEnd,
-      dnd: const DndWindow(enabled: false),
-      now: now,
-    );
-  }
-
   /// 暂停 / 恢复：暂停=不生成未来实例（不排闹钟、预览为空），恢复继续生成。
   Future<void> _togglePause() async {
     final app = context.read<AppNotifier>();
@@ -440,11 +416,6 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
                   value: isEnabled,
                   onChanged: (_) => _togglePause(),
                 ),
-                const SizedBox(height: 8),
-                const Text('未来一个月会提醒：',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                const SizedBox(height: 6),
-                _FuturePreview(dates: futureMonthPreview()),
               ],
             ],
           ),
@@ -460,40 +431,6 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
         const SizedBox(width: 8),
         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
         FilledButton(onPressed: _save, child: const Text('保存')),
-      ],
-    );
-  }
-}
-
-/// 未来一个月提醒日期小胶囊预览
-class _FuturePreview extends StatelessWidget {
-  final List<DateTime> dates;
-
-  const _FuturePreview({required this.dates});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.primary;
-    if (dates.isEmpty) {
-      return Text('（暂停或已过期，未来 30 天没有提醒）',
-          style: TextStyle(fontSize: 12, color: Colors.grey));
-    }
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        for (final d in dates)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '${d.month}/${d.day} ${two(d.hour)}:${two(d.minute)}',
-              style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
-            ),
-          ),
       ],
     );
   }

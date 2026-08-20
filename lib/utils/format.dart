@@ -157,7 +157,7 @@ class _TimePickerSheetState extends State<_TimePickerSheet> {
           ),
           const SizedBox(height: 4),
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
               const SizedBox(width: 8),
