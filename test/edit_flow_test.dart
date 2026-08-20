@@ -36,10 +36,10 @@ void main() {
     // 时间轴应显示该提醒
     expect(find.text('早杯'), findsOneWidget);
 
-    // 点击时间轴不打开编辑；左滑滑出「编辑」进入
+    // 点击时间轴不打开编辑；左滑滑出「当天调整」进入
     await tester.drag(find.text('早杯'), const Offset(-300, 0));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('编辑'));
+    await tester.tap(find.text('当天调整'));
     await tester.pumpAndSettle();
     expect(find.text('编辑提醒'), findsOneWidget); // 弹窗标题
 

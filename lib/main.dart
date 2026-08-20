@@ -7,6 +7,7 @@ import 'package:workmanager/workmanager.dart';
 
 import 'data/app_database.dart';
 import 'screens/home_screen.dart';
+import 'screens/reminders_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/stats_screen.dart';
 import 'services/notification_service.dart';
@@ -125,8 +126,13 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      const HomeScreen(),
+      HomeScreen(
+        onGoToReminders: () {
+          if (mounted) setState(() => _index = 2);
+        },
+      ),
       const StatsScreen(),
+      const RemindersScreen(),
       const SettingsScreen(),
     ];
     return Scaffold(
@@ -144,6 +150,11 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon: Icon(Icons.bar_chart),
             label: '统计',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.edit_calendar_outlined),
+            selectedIcon: Icon(Icons.edit_calendar),
+            label: '提醒',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

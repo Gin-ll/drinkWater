@@ -13,7 +13,10 @@ import 'reminder_form_dialog.dart';
 
 /// 首页：今日喝水时间轴 + 快捷标记
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  /// 跳转到「提醒」页（空状态“添加提醒”入口用）
+  final VoidCallback? onGoToReminders;
+
+  const HomeScreen({super.key, this.onGoToReminders});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -99,14 +102,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openAdd() async {
-    final saved = await ReminderFormDialog.show(context);
-    if (saved && mounted) {
-      showTopToast(context, '提醒已保存');
-      _reload();
-    }
-  }
-
   Future<void> _openEdit(Reminder reminder,
       {String? overriddenOn, TimeOfDay? initialTime}) async {
     final saved = await ReminderFormDialog.show(
@@ -151,21 +146,33 @@ class _HomeScreenState extends State<HomeScreen> {
     _reload();
   }
 
-  Future<void> _confirmDelete(Reminder r) async {
+  /// 首页「删除今天」：跳过当天实例，规则（循环与一次性）与喝水记录保留。
+  Future<void> _confirmDeleteToday(TodayEntry e) async {
+    final reminder = e.reminder;
+    if (reminder == null) return;
     final app = context.read<AppNotifier>();
+    final isOnce = reminder.repeatType == repeatOnce;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('删除提醒'),
-        content: Text('确定删除「${r.title}」吗？相关喝水记录也会一并删除。'),
+        title: const Text('删除今天的提醒'),
+        content: Text(
+          isOnce
+              ? '删除今天的这次提醒？\n该提醒历史记录将保留，不影响喝水记录。'
+              : '删除今天的这次提醒？\n✓ 今天及之前已产生的提醒记录会保留\n✓ 喝水记录不会删除\n✓ 规则与未来提醒不受影响',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFE5484D)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('删除'),
+          ),
         ],
       ),
     );
     if (ok == true) {
-      await app.deleteReminder(r.id);
+      await app.skipTodayInstance(reminder.id, toDateString(_day));
       if (mounted) _reload();
     }
   }
@@ -176,13 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('喝水'),
-        actions: [
-          IconButton(
-            tooltip: '新建提醒',
-            icon: const Icon(Icons.add),
-            onPressed: _openAdd,
-          ),
-        ],
+        // 新建/编辑已在「提醒」页；首页不再提供 + / 规则编辑
       ),
       body: Column(
         children: [
@@ -214,9 +215,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         return _ThemedEmptyState(
                           icon: Icons.add_alarm,
                           title: '暂无启用中的喝水提醒',
-                          subtitle: '设置你的第一条喝水提醒吧',
+                          subtitle: '到「提醒」页设置你的第一条喝水提醒吧',
                           actionText: '添加提醒',
-                          onAction: _openAdd,
+                          // 添加/编辑已迁移到「提醒」页
+                          onAction: widget.onGoToReminders ?? () {},
                         );
                       }
                       return _ThemedEmptyState(
@@ -278,14 +280,15 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: tile,
                           );
                         }
-                        // 提醒记录：左滑「编辑/删除」；编辑携带当天生效时间与“仅当天”上下文
+                        // 提醒记录：左滑「当天调整 / 删除今天」；规则级编辑在「提醒」页
                         return Slidable(
                           key: ValueKey('tile-${e.reminder!.id}-${e.time.millisecondsSinceEpoch}'),
                           endActionPane: ActionPane(
                             motion: const DrawerMotion(),
-                            extentRatio: 0.3,
+                            extentRatio: 0.32,
                             children: [
                               SlidableAction(
+                                // 当天调整：改今天时间不影响未来（override）
                                 onPressed: (_) => _openEdit(
                                   e.reminder!,
                                   overriddenOn: toDateString(_day),
@@ -293,16 +296,17 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 backgroundColor: Theme.of(context).colorScheme.primary,
                                 foregroundColor: Colors.white,
-                                icon: Icons.edit,
-                                label: '编辑',
+                                icon: Icons.tune,
+                                label: '当天调整',
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               SlidableAction(
-                                onPressed: (_) => _confirmDelete(e.reminder!),
+                                // 删除今天：跳过当天实例，规则与喝水记录保留
+                                onPressed: (_) => _confirmDeleteToday(e),
                                 backgroundColor: const Color(0xFFE5484D),
                                 foregroundColor: Colors.white,
                                 icon: Icons.delete_outline,
-                                label: '删除',
+                                label: '删除今天',
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ],
