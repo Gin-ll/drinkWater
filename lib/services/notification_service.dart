@@ -17,26 +17,34 @@ const String actionMiss = 'miss';
 const String reminderChannelId = 'drink_reminders';
 
 /// 通知 payload（嵌入每条通知，按钮回调据此写库）
+/// 与 Reminder 明确关联：notificationId / reminderId / occurDate(scheduledTime归属日)
 class NotificationPayload {
-  final int reminderId;
-  final String occurDate; // YYYY-MM-DD 本地日期
+  final int notificationId; // 系统通知 ID（可追溯）
+  final int reminderId; // 关联提醒
+  final String occurDate; // YYYY-MM-DD 本地日期（该次提醒的归属日）
   final String dbPath;
 
   const NotificationPayload({
+    required this.notificationId,
     required this.reminderId,
     required this.occurDate,
     required this.dbPath,
   });
 
-  String toJson() =>
-      jsonEncode({'reminderId': reminderId, 'occurDate': occurDate, 'dbPath': dbPath});
+  String toJson() => jsonEncode({
+        'notificationId': notificationId,
+        'reminderId': reminderId,
+        'occurDate': occurDate,
+        'dbPath': dbPath,
+      });
 
   static NotificationPayload? fromJson(String? json) {
     if (json == null || json.isEmpty) return null;
     try {
       final map = jsonDecode(json) as Map<String, dynamic>;
       return NotificationPayload(
-        reminderId: map['reminderId'] as int,
+        notificationId: (map['notificationId'] as num?)?.toInt() ?? 0,
+        reminderId: (map['reminderId'] as num).toInt(),
         occurDate: map['occurDate'] as String,
         dbPath: map['dbPath'] as String,
       );
@@ -170,6 +178,7 @@ class NotificationService {
       notificationDetails: const NotificationDetails(android: _details),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: NotificationPayload(
+        notificationId: id,
         reminderId: r.id,
         occurDate: toDateString(at),
         dbPath: dbPath,

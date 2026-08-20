@@ -86,6 +86,34 @@ void main() {
 
     await db.close();
   });
+
+  test('±30 分钟手动喝水自动完成提醒（P0-01）', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    final now = DateTime.now();
+    await db.insertReminder(
+      RemindersCompanion.insert(
+        title: const Value('自动完成'),
+        repeatType: repeatDaily,
+        hour: now.hour, // 与当前时刻相近的提醒时间
+        minute: now.minute,
+        weekdays: const Value(''),
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    final notifier = AppNotifier(db: db)..addListener(() {});
+    await notifier.init(schedule: false);
+
+    // 手动喝水（与提醒时间差 < 30 分钟）
+    await notifier.recordDrinkNow();
+
+    final timeline = await notifier.todayTimeline();
+    final e = timeline.firstWhere((x) => x.reminder?.title == '自动完成');
+    expect(e.autoMatched, isTrue);
+    expect(e.log, isNotNull);
+
+    await db.close();
+  });
 }
 
 String toDateString(DateTime t) {

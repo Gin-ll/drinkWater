@@ -2,7 +2,9 @@ import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:drink_water/constants.dart';
 import 'package:drink_water/data/app_database.dart';
+import 'package:drink_water/services/notification_service.dart';
 import 'package:drink_water/services/occurrence_calculator.dart';
 import 'package:drink_water/theme.dart';
 
@@ -161,6 +163,46 @@ void main() {
       final tuesday = DateTime(2026, 8, 25); // 周二
       expect(hasConflictAtTime(reminders, 9, 0, monday), isTrue);
       expect(hasConflictAtTime(reminders, 9, 0, tuesday), isFalse);
+    });
+  });
+
+  group('P0 数据语义', () {
+    test('删除提醒保留历史喝水记录（P0-02）', () async {
+      final rid = await addDailyReminder();
+      await db.insertDrinkLog(
+          reminderId: rid, actionTime: DateTime(2026, 8, 19, 10, 0), occurDate: '2026-08-19', isDrank: true);
+      await db.deleteReminder(rid);
+      final day = await db.logsOfDay('2026-08-19');
+      expect(day.length, 1);
+      expect(day.first.reminderId, rid);
+      final counts = await db.drankCountsByDay('2026-08-19', '2026-08-20');
+      expect(counts['2026-08-19'], 1);
+    });
+
+    test('编辑提醒不改历史记录（P0-03）', () async {
+      final rid = await addDailyReminder(hour: 10, minute: 0);
+      await db.insertDrinkLog(
+          reminderId: rid, actionTime: DateTime(2026, 8, 19, 10, 0), occurDate: '2026-08-19', isDrank: true);
+      final r = (await db.getReminder(rid))!;
+      await db.updateReminder(r.copyWith(hour: 14, updatedAt: DateTime.now()));
+      final after = await db.logsOfDay('2026-08-19');
+      expect(after.single.actionTime.hour, 10);
+      expect(after.single.reminderId, rid);
+    });
+
+    test('通知数据与 Reminder 明确关联（P0-04 payload 往返）', () {
+      final payload = NotificationPayload(
+        notificationId: 10001,
+        reminderId: 1,
+        occurDate: '2026-08-20',
+        dbPath: '/x/drink_water.sqlite',
+      );
+      final restored = NotificationPayload.fromJson(payload.toJson());
+      expect(restored, isNotNull);
+      expect(restored!.notificationId, 10001);
+      expect(restored.reminderId, 1);
+      expect(restored.occurDate, '2026-08-20');
+      expect(reminderMatchWindow, const Duration(minutes: 30));
     });
   });
 

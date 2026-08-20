@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
+import '../constants.dart';
 import '../data/app_database.dart';
 import '../services/notification_service.dart';
 import '../services/occurrence_calculator.dart';
@@ -14,11 +15,15 @@ class TodayEntry {
   final bool inDnd;
   final DrinkLog? log;
 
+  /// 是否由「该提醒对应 DrinkLog」之外的记录判定（如 ±窗口内手动喝水自动完成）
+  final bool autoMatched;
+
   const TodayEntry({
     required this.reminder,
     required this.time,
     required this.inDnd,
     this.log,
+    this.autoMatched = false,
   });
 
   bool get isFuture => time.isAfter(DateTime.now());
@@ -155,7 +160,7 @@ class AppNotifier extends ChangeNotifier {
   }
 
   Future<void> deleteReminder(int id) async {
-    await db.deleteLogsOfReminder(id);
+    // P0-02：删除提醒只删未来提醒配置，不删历史喝水记录，统计保持不变
     await db.deleteReminder(id);
     await refresh();
     await NotificationService.rescheduleAll(db);
@@ -195,6 +200,9 @@ class AppNotifier extends ChangeNotifier {
     final logById = <int, DrinkLog>{for (final l in logs) if (l.reminderId != null) l.reminderId! : l};
 
     final entries = <TodayEntry>[];
+    // 当日手动喝水记录（reminderId 为空，独立记录）
+    final manualLogs = logs.where((l) => l.reminderId == null).toList();
+
     for (final r in reminders) {
       if (!r.enabled) continue;
       final time = occurrenceOnDay(
@@ -208,16 +216,33 @@ class AppNotifier extends ChangeNotifier {
         startOn: r.createdAt, // 新建循环从创建当天起算，之前不回填
       );
       if (time == null) continue;
+
+      // 该提醒自己对应的 DrinkLog（存在 → 已喝水）
+      DrinkLog? log = logById[r.id];
+      var autoMatched = false;
+      // 不存在对应记录时：提醒时间前后 reminderMatchWindow（默认 30 分钟）内
+      // 存在手动喝水 → 自动判定为「已喝水」，避免刚喝完又提醒
+      if (log == null) {
+        for (final m in manualLogs) {
+          if (m.isDrank && (m.actionTime.difference(time).abs() <= reminderMatchWindow)) {
+            log = m;
+            autoMatched = true;
+            break;
+          }
+        }
+      }
+
       entries.add(TodayEntry(
         reminder: r,
         time: time,
         inDnd: dnd.contains(time),
-        log: logById[r.id],
+        log: log,
+        autoMatched: autoMatched,
       ));
     }
 
     // 手动喝水记录（无关联提醒，按点按时间落时间轴）
-    for (final l in logs.where((l) => l.reminderId == null)) {
+    for (final l in manualLogs) {
       entries.add(TodayEntry(
         reminder: null,
         time: l.actionTime,
