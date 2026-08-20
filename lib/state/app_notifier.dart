@@ -246,6 +246,12 @@ class AppNotifier extends ChangeNotifier {
   Future<List<TodayEntry>> timelineFor(DateTime day) async {
     final dayDate = DateTime(day.year, day.month, day.day);
     final dayStr = toDateString(dayDate);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    // 规则只在「未来 30 天」内生成提醒：超出 30 天的未来日期不再生成实例
+    if (dayDate.isAfter(today.add(const Duration(days: 30)))) {
+      return const [];
+    }
     final dnd = parseDndWindow(settings);
     final logs = await db.logsOfDay(dayStr);
     final logById = <int, DrinkLog>{for (final l in logs) if (l.reminderId != null) l.reminderId! : l};
