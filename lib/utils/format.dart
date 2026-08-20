@@ -30,6 +30,14 @@ String formatWeekdays(List<int> days) {
   return days.map((d) => weekNames[d - 1]).join('、');
 }
 
+/// 按时间自动分配的提醒图标：早🌅 午☀️ 晚🍚 夜🌙
+String drinkEmoji(int hour) {
+  if (hour >= 5 && hour < 12) return '🌅';
+  if (hour >= 12 && hour < 18) return '☀️';
+  if (hour >= 18 && hour < 24) return '🍚';
+  return '🌙';
+}
+
 /// 时间段（统计页用）
 String periodOf(DateTime t) {
   final h = t.hour;
