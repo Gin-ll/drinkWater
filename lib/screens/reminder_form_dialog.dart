@@ -43,14 +43,16 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
   void initState() {
     super.initState();
     final r = widget.reminder;
-    _title = TextEditingController(text: r?.title ?? '');
+    // 标题默认「喝水提醒」，不手动修改即为该标题
+    _title = TextEditingController(text: r?.title ?? '喝水提醒');
     _repeatType = r?.repeatType ?? repeatDaily;
     _time = TimeOfDay(hour: r?.hour ?? 8, minute: r?.minute ?? 0);
     _weekdays = r == null ? [DateTime.now().weekday] : AppDatabase.decodeWeekdays(r.weekdays);
     _monthDay = r?.monthDay ?? DateTime.now().day;
-    if (r != null && r.triggerAt != null) {
-      _oneTimeDate = DateTime.fromMillisecondsSinceEpoch(r.triggerAt!);
-    }
+    // 一次性提醒日期默认今天
+    _oneTimeDate = (r != null && r.triggerAt != null)
+        ? DateTime.fromMillisecondsSinceEpoch(r.triggerAt!)
+        : DateTime.now();
   }
 
   @override
@@ -189,6 +191,12 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
         _toast('每周循环请至少选择一天');
         return;
       }
+      // 提醒时间不能早于当前时间
+      final nowMin = DateTime.now().hour * 60 + DateTime.now().minute;
+      if (_time.hour * 60 + _time.minute < nowMin) {
+        _toast('提醒时间不能早于当前时间');
+        return;
+      }
       // 同刻去重提示
       if (!await _ensureNoTimeConflict(_time.hour, _time.minute)) return;
       if (_isEdit) {
@@ -210,7 +218,10 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
   Widget build(BuildContext context) {
     final dateFmt = DateFormat('yyyy年M月d日');
     return AlertDialog(
-      title: Text(_isEdit ? '编辑提醒' : '新建提醒'),
+      title: Text(
+        _isEdit ? '编辑提醒' : '新建提醒',
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      ),
       content: SizedBox(
         width: double.maxFinite,
         child: SingleChildScrollView(

@@ -19,8 +19,8 @@ void main() {
         title: const Value('早杯'),
         body: const Value('早上第一杯'),
         repeatType: repeatDaily,
-        hour: 9,
-        minute: 0,
+        hour: now.hour, // 用当前时间，规避「提醒时间不能早于当前时间」校验干扰
+        minute: now.minute,
         weekdays: const Value(''),
         createdAt: now,
         updatedAt: now,
