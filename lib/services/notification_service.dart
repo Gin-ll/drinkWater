@@ -116,22 +116,11 @@ class NotificationService {
     }
   }
 
-  /// 免打扰开启时的一次性调度窗口（天）。此模式每提醒会占多个闹钟槽位，
-  /// 窗口设短以避免触碰安卓「每应用 500 个并发闹钟」上限。
-  static const int dndWindowDays = 7;
-
-  // 通知 ID 偏移表（base = reminderId * idBase）
-  static const int _idOffsetOnce = 0; // 一次性
-  static const int _idOffsetDaily = 1; // 每天（原生循环）
-  static const int _idOffsetMonthly = 2; // 每月（原生循环）
-  static const int _idOffsetWeeklyBase = 20; // 每周：20 + weekday(1..7)
-  static const int _idOffsetExtrasBase = 100; // 每月月末兜底 / DND 窗口一次性
-
-  /// 全量刷新：撤销旧闹钟 → 按提醒类型注册。
+  /// 全量刷新：撤销旧闹钟 → 仅登记「当天」的触发闹钟。
   ///
-  /// 循环提醒（每天/每周/每月）默认用**系统原生循环闹钟**（每条 1 个），避免
-  /// 每条提醒产生约 90 个一次性闹钟而触碰安卓「每应用 500 个并发闹钟」上限。
-  /// 仅当开启免打扰时，才退化为短窗口一次性调度以支持「时段内完全跳过」。
+  /// 规则（需求约定）：只有今天的触发点才注册为系统闹钟；
+  /// 过去的触发点仅保留为历史数据、不设闹钟；未来日期不预排闹钟。
+  /// 循环类提醒在新的一天重新打开 App（或开机广播恢复）后会重新登记当天闹钟。
   /// 任何调度失败只记录日志、不向上抛出，确保保存/增删改流程永不中断。
   static Future<void> rescheduleAll(AppDatabase db) async {
     if (skipScheduling) return;
@@ -141,178 +130,53 @@ class NotificationService {
       final dnd = parseDndWindow(settings);
       final dbPath = await getDbPath();
       final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
 
       for (final r in reminders) {
         await _cancelIdsOfReminder(r.id);
         if (!r.enabled) continue;
 
-        final triggerAt = r.triggerAt == null
-            ? null
-            : DateTime.fromMillisecondsSinceEpoch(r.triggerAt!);
+        // 计算「今天」的触发时刻（一次性提醒仅在其触发当天命中）
+        final occurrence = occurrenceOnDay(
+          repeatType: r.repeatType,
+          hour: r.hour,
+          minute: r.minute,
+          weekdays: AppDatabase.decodeWeekdays(r.weekdays),
+          monthDay: r.monthDay,
+          triggerAt: r.triggerAt == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(r.triggerAt!),
+          day: today,
+        );
+        if (occurrence == null) continue; // 今天不触发 → 不设闹钟
+        if (!occurrence.isAfter(now)) continue; // 已错过 → 仅保留数据
+        if (dnd.contains(occurrence)) continue; // 免打扰内 → 完全跳过
 
-        // 循环类型：仅当该提醒的固定时间点本身会落在免打扰窗口内时，
-        // 才退化为短窗口一次性调度（剔除 DND 内时刻）；否则用系统原生循环闹钟
-        // （1 条 1 个，远离 500 并发上限）。
-        if (r.repeatType != repeatOnce &&
-            dnd.containsTimeOfDay(r.hour * 60 + r.minute)) {
-          await _scheduleDndWindow(r, triggerAt, dnd, dbPath, now);
-          continue;
-        }
-        switch (r.repeatType) {
-          case repeatOnce:
-            await _scheduleOnce(r, triggerAt, dnd, dbPath, now);
-          case repeatDaily:
-            await _scheduleRecurringDaily(r, dbPath, now);
-          case repeatWeekly:
-            await _scheduleRecurringWeekly(r, dbPath, now);
-          case repeatMonthly:
-            await _scheduleRecurringMonthly(r, dbPath, now);
-        }
+        await _schedule(_idFor(r.id, 0), r, occurrence, dbPath);
       }
     } catch (e) {
       debugPrint('[notify] rescheduleAll 异常（已忽略，避免中断业务）: $e');
     }
   }
 
-  /// 注册单个通知（可带原生循环组件）。
-  static Future<void> _schedule(
-    int id,
-    Reminder r,
-    DateTime first,
-    String dbPath, {
-    DateTimeComponents? matchComponents,
-  }) async {
+  /// 注册单个当天一次性闹钟。
+  static Future<void> _schedule(int id, Reminder r, DateTime at, String dbPath) async {
     await _plugin.zonedSchedule(
       id: id,
       title: r.title,
       body: r.body,
-      scheduledDate: tz.TZDateTime.from(first, tz.local),
+      scheduledDate: tz.TZDateTime.from(at, tz.local),
       notificationDetails: const NotificationDetails(android: _details),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: matchComponents,
       payload: NotificationPayload(
         reminderId: r.id,
-        occurDate: toDateString(first),
+        occurDate: toDateString(at),
         dbPath: dbPath,
       ).toJson(),
     );
   }
 
-  /// 一次性提醒：单次注册，落在免打扰内则跳过。
-  static Future<void> _scheduleOnce(
-    Reminder r,
-    DateTime? triggerAt,
-    DndWindow dnd,
-    String dbPath,
-    DateTime now,
-  ) async {
-    if (triggerAt == null || !triggerAt.isAfter(now)) return;
-    if (dnd.contains(triggerAt)) return;
-    await _schedule(_idFor(r.id, _idOffsetOnce), r, triggerAt, dbPath);
-  }
-
-  /// 每天：原生循环闹钟。
-  static Future<void> _scheduleRecurringDaily(Reminder r, String dbPath, DateTime now) async {
-    var t = DateTime(now.year, now.month, now.day, r.hour, r.minute);
-    if (!t.isAfter(now)) t = t.add(const Duration(days: 1));
-    await _schedule(
-      _idFor(r.id, _idOffsetDaily),
-      r,
-      t,
-      dbPath,
-      matchComponents: DateTimeComponents.time,
-    );
-  }
-
-  /// 每周：每个选中日一个原生循环闹钟。
-  static Future<void> _scheduleRecurringWeekly(Reminder r, String dbPath, DateTime now) async {
-    final days = AppDatabase.decodeWeekdays(r.weekdays);
-    for (final wd in days) {
-      for (var i = 0; i < 8; i++) {
-        final d = now.add(Duration(days: i));
-        if (d.weekday == wd) {
-          var t = DateTime(d.year, d.month, d.day, r.hour, r.minute);
-          if (!t.isAfter(now)) t = t.add(const Duration(days: 7));
-          await _schedule(
-            _idFor(r.id, _idOffsetWeeklyBase + wd),
-            r,
-            t,
-            dbPath,
-            matchComponents: DateTimeComponents.dayOfWeekAndTime,
-          );
-          break;
-        }
-      }
-    }
-  }
-
-  /// 每月 + 月末兜底：
-  /// - 主闹钟：按所选日期每月循环（在有该日期的月份触发）
-  /// - 补充分发：未来 13 个月内「当月天数不足所选日期」的月份，各补一个一次性闹钟到月末
-  static Future<void> _scheduleRecurringMonthly(Reminder r, String dbPath, DateTime now) async {
-    final day = r.monthDay;
-    if (day == null) return;
-
-    DateTime? first;
-    var m = DateTime(now.year, now.month, 1);
-    for (var i = 0; i < 24 && first == null; i++) {
-      if (day <= daysInMonth(m.year, m.month)) {
-        final t = DateTime(m.year, m.month, day, r.hour, r.minute);
-        if (t.isAfter(now)) first = t;
-      }
-      m = DateTime(m.year, m.month + 1, 1);
-    }
-    if (first != null) {
-      await _schedule(
-        _idFor(r.id, _idOffsetMonthly),
-        r,
-        first,
-        dbPath,
-        matchComponents: DateTimeComponents.dayOfMonthAndTime,
-      );
-    }
-
-    var idx = 0;
-    m = DateTime(now.year, now.month, 1);
-    for (var i = 0; i < 13; i++) {
-      final lastDay = daysInMonth(m.year, m.month);
-      if (day > lastDay) {
-        final t = DateTime(m.year, m.month, lastDay, r.hour, r.minute);
-        if (t.isAfter(now)) {
-          await _schedule(_idFor(r.id, _idOffsetExtrasBase + idx), r, t, dbPath);
-          idx++;
-        }
-      }
-      m = DateTime(m.year, m.month + 1, 1);
-    }
-  }
-
-  /// 免打扰短窗口：一次性闹钟（默认 30 天），剔除窗口内时刻。
-  static Future<void> _scheduleDndWindow(
-    Reminder r,
-    DateTime? triggerAt,
-    DndWindow dnd,
-    String dbPath,
-    DateTime now,
-  ) async {
-    final occ = computeOccurrences(
-      repeatType: r.repeatType,
-      hour: r.hour,
-      minute: r.minute,
-      weekdays: AppDatabase.decodeWeekdays(r.weekdays),
-      monthDay: r.monthDay,
-      triggerAt: triggerAt,
-      windowStart: now,
-      windowEnd: now.add(const Duration(days: dndWindowDays)),
-      dnd: dnd,
-      now: now,
-    );
-    for (var i = 0; i < occ.length; i++) {
-      await _schedule(_idFor(r.id, _idOffsetExtrasBase + i), r, occ[i], dbPath);
-    }
-  }
-
-  /// 撤销单条提醒名下全部可能的历史 ID（含旧版一次性窗口占用的槽位）。
+  /// 撤销单条提醒名下全部可能的历史 ID（含旧版本一次性窗口占用的槽位）。
   static Future<void> _cancelIdsOfReminder(int reminderId) async {
     final base = reminderId * idBase;
     final ids = <int>{for (var i = 0; i <= 250; i++) base + i};
