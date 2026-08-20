@@ -86,9 +86,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _recordDrink() async {
     final app = context.read<AppNotifier>();
-    await app.recordDrinkNow();
+    final id = await app.recordDrinkNow();
     if (mounted) {
-      showTopToast(context, '已记录一杯水 💧');
+      // P0-09：可撤销
+      showTopToast(
+        context,
+        '已记录一杯水 💧',
+        actionLabel: '撤销',
+        onAction: () => app.deleteDrinkLog(id),
+      );
       _reload();
     }
   }
@@ -173,7 +179,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                   final entries = snapshot.data ?? const [];
                   if (entries.isEmpty) {
-                    return const _EmptyState();
+                    // P0-10 空状态：按场景提供文案 + 操作入口
+                    final hasEnabled = app.reminders.any((r) => r.enabled);
+                    if (_isToday) {
+                      if (!hasEnabled) {
+                        return _ThemedEmptyState(
+                          icon: Icons.add_alarm,
+                          title: '暂无启用中的喝水提醒',
+                          subtitle: '设置你的第一条喝水提醒吧',
+                          actionText: '添加提醒',
+                          onAction: _openAdd,
+                        );
+                      }
+                      return _ThemedEmptyState(
+                        icon: Icons.local_drink,
+                        title: '还没有喝水记录',
+                        subtitle: '开始记录今天的第一杯水吧',
+                        actionText: '喝一杯水',
+                        onAction: _recordDrink,
+                      );
+                    }
+                    return _ThemedEmptyState(
+                      icon: Icons.water,
+                      title: '暂无历史喝水记录',
+                      subtitle: '这一天还没有喝水记录',
+                      actionText: '回到今天',
+                      onAction: _goToday,
+                    );
                   }
                   // SlidableAutoCloseBehavior：保证同一时刻只允许一个卡片滑开
                   return SlidableAutoCloseBehavior(
@@ -300,24 +332,57 @@ class _DateHeader extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+/// 主题化空状态（P0-10）：图标 + 标题 + 副标题 + 操作按钮，跟随主题色。
+class _ThemedEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String actionText;
+  final VoidCallback onAction;
+
+  const _ThemedEmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.actionText,
+    required this.onAction,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         // 保证空状态也能下拉刷新
         physics: const AlwaysScrollableScrollPhysics(),
         child: SizedBox(
           height: constraints.maxHeight,
-          child: const Center(
+          child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.water_drop_outlined, size: 64, color: Colors.blueGrey),
-                SizedBox(height: 12),
-                Text('当天暂无喝水提醒\n点右上角 + 新建', textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey)),
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, size: 36, color: color),
+                ),
+                const SizedBox(height: 14),
+                Text(title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Text(subtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                const SizedBox(height: 18),
+                FilledButton.icon(
+                  onPressed: onAction,
+                  icon: const Icon(Icons.add),
+                  label: Text(actionText),
+                ),
               ],
             ),
           ),
@@ -429,13 +494,22 @@ class _TimelineTile extends StatelessWidget {
                               child: IconButton(
                                 tooltip: '标记已喝',
                                 iconSize: 28,
-                                onPressed: () {
+                                onPressed: () async {
                                   if (canMark) {
-                                    app.mark(
+                                    final id = await app.mark(
                                       reminderId: entry.reminder!.id,
                                       isDrank: true,
                                       occurDate: occurDate,
                                     );
+                                    // P0-09：可撤销
+                                    if (context.mounted) {
+                                      showTopToast(
+                                        context,
+                                        '已标记已喝',
+                                        actionLabel: '撤销',
+                                        onAction: () => app.deleteDrinkLog(id),
+                                      );
+                                    }
                                   } else {
                                     showTopToast(context, '仅今天可标记已喝');
                                   }

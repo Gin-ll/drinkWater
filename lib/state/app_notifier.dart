@@ -176,17 +176,18 @@ class AppNotifier extends ChangeNotifier {
 
   // ---------- 喝水标记 ----------
 
-  /// 标记已喝/未喝：同一提醒同一天只保留最后一次结果。
-  Future<void> mark({required int reminderId, required bool isDrank, String? occurDate}) async {
+  /// 标记已喝/未喝：同一提醒同一天只保留最后一次结果。返回新记录的 id（供撤销）。
+  Future<int> mark({required int reminderId, required bool isDrank, String? occurDate}) async {
     final date = occurDate ?? toDateString(DateTime.now());
     await db.deleteLogOf(reminderId, date);
-    await db.insertDrinkLog(
+    final id = await db.insertDrinkLog(
       reminderId: reminderId,
       actionTime: DateTime.now(),
       occurDate: date,
       isDrank: isDrank,
     );
     notifyListeners();
+    return id;
   }
 
   // ---------- 首页时间轴 ----------
@@ -261,16 +262,24 @@ class AppNotifier extends ChangeNotifier {
     return timelineFor(DateTime(now.year, now.month, now.day));
   }
 
-  /// 手动记录「现在喝了一杯水」。
-  Future<void> recordDrinkNow() async {
+  /// 手动记录「现在喝了一杯水」。返回新记录 id（供撤销）。
+  Future<int> recordDrinkNow() async {
     final now = DateTime.now();
-    await db.insertDrinkLog(
+    final id = await db.insertDrinkLog(
       reminderId: null,
       actionTime: now,
       occurDate: toDateString(now),
       isDrank: true,
     );
     notifyListeners();
+    return id;
+  }
+
+  /// P0-07：进入前台时校准调度（时间/时区变化后重算当天闹钟）。
+  /// cancel-first 保证不重复注册；仅当天未来时刻 → 不补发已错过历史。
+  Future<void> recalibrate() async {
+    await refresh();
+    await NotificationService.rescheduleAll(db);
   }
 
   /// 编辑手动喝水记录的时间（保持归属日期不变）。
