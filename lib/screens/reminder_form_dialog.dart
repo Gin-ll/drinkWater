@@ -30,7 +30,6 @@ class ReminderFormDialog extends StatefulWidget {
 
 class _ReminderFormDialogState extends State<ReminderFormDialog> {
   late final TextEditingController _title;
-  late final TextEditingController _body;
   late int _repeatType;
   late TimeOfDay _time;
   late List<int> _weekdays;
@@ -44,7 +43,6 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
     super.initState();
     final r = widget.reminder;
     _title = TextEditingController(text: r?.title ?? '');
-    _body = TextEditingController(text: r?.body ?? '');
     _repeatType = r?.repeatType ?? repeatDaily;
     _time = TimeOfDay(hour: r?.hour ?? 8, minute: r?.minute ?? 0);
     _weekdays = r == null ? [DateTime.now().weekday] : AppDatabase.decodeWeekdays(r.weekdays);
@@ -57,7 +55,6 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
   @override
   void dispose() {
     _title.dispose();
-    _body.dispose();
     super.dispose();
   }
 
@@ -147,12 +144,12 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
       }
       if (_isEdit) {
         await app.updateReminder(widget.reminder!.id,
-            title: title, body: _body.text.trim(),
+            title: title, body: widget.reminder!.body,
             repeatType: repeatOnce, hour: 0, minute: 0,
             triggerAt: triggerAt);
       } else {
         await app.addReminder(
-            title: title, body: _body.text.trim(),
+            title: title, body: '',
             repeatType: repeatOnce, hour: 0, minute: 0,
             triggerAt: triggerAt);
       }
@@ -163,12 +160,12 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
       }
       if (_isEdit) {
         await app.updateReminder(widget.reminder!.id,
-            title: title, body: _body.text.trim(),
+            title: title, body: widget.reminder!.body,
             repeatType: _repeatType, hour: _time.hour, minute: _time.minute,
             weekdays: _weekdays, monthDay: _monthDay);
       } else {
         await app.addReminder(
-            title: title, body: _body.text.trim(),
+            title: title, body: '',
             repeatType: _repeatType, hour: _time.hour, minute: _time.minute,
             weekdays: _weekdays, monthDay: _monthDay);
       }
@@ -195,16 +192,6 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
                   hintText: '例如：喝水提醒',
                   border: OutlineInputBorder(),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _body,
-                decoration: const InputDecoration(
-                  labelText: '正文（选填）',
-                  hintText: '例如：记得多喝水 💧',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
               ),
               const SizedBox(height: 16),
               SegmentedButton<int>(
