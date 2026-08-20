@@ -52,12 +52,15 @@ class SettingsTable extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-/// 按天临时调整提醒时间（如“今天 10:00 改到 14:00”），只作用于该日期，不影响未来规则。
+/// 按天临时调整提醒时间 / 跳过某一天。
+/// - 仅调整时间：isSkipped=false，用 hour/minute
+/// - 删除当天实例（跳过）：isSkipped=true，该日不出现、不排闹钟
 class ReminderOverrides extends Table {
   IntColumn get reminderId => integer().references(Reminders, #id)();
   TextColumn get overriddenOn => text()(); // YYYY-MM-DD
   IntColumn get hour => integer()();
   IntColumn get minute => integer()();
+  BoolColumn get isSkipped => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {reminderId, overriddenOn};
@@ -76,7 +79,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -85,6 +88,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 2) {
             // 新增「按天临时调整」表
             await m.createTable(reminderOverrides);
+          }
+          if (from < 3) {
+            // 支持「跳过当天实例」：新增 is_skipped 列
+            await m.addColumn(reminderOverrides, reminderOverrides.isSkipped);
           }
         },
       );
@@ -144,6 +151,19 @@ class AppDatabase extends _$AppDatabase {
           ..where(
               (t) => t.reminderId.equals(reminderId) & t.overriddenOn.equals(date)))
         .go();
+  }
+
+  /// 跳过某一天（删除当天实例）：当天不出现、不排闹钟；规则与喝水记录保留。
+  Future<void> skipDay(int reminderId, String date) {
+    return into(reminderOverrides).insertOnConflictUpdate(
+      ReminderOverridesCompanion.insert(
+        reminderId: reminderId,
+        overriddenOn: date,
+        hour: 0,
+        minute: 0,
+        isSkipped: const Value(true),
+      ),
+    );
   }
 
   Future<void> deleteOverridesOfReminder(int reminderId) {

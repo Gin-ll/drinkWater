@@ -183,8 +183,11 @@ class AppNotifier extends ChangeNotifier {
     );
     if (base == null) return null;
     final ov = await db.overrideFor(r.id, toDateString(dayDate));
-    if (ov == null) return base;
-    return DateTime(dayDate.year, dayDate.month, dayDate.day, ov.hour, ov.minute);
+    if (ov != null) {
+      if (ov.isSkipped) return null; // 当天被跳过（删除当天实例）
+      return DateTime(dayDate.year, dayDate.month, dayDate.day, ov.hour, ov.minute);
+    }
+    return base;
   }
 
   /// 仅调整某一天（不改未来规则）。时间与规则一致时等价于清除调整。
@@ -201,6 +204,14 @@ class AppNotifier extends ChangeNotifier {
 
   Future<void> clearDayOverride(int reminderId, String date) async {
     await db.clearOverride(reminderId, date);
+    await refresh();
+    await NotificationService.rescheduleAll(db);
+  }
+
+  /// 首页「删除今天」：跳过当天实例（当天不显示、不排当天闹钟）；
+  /// 规则（循环与一次性）保留，历史喝水记录保留（P0-02）。
+  Future<void> skipTodayInstance(int reminderId, String date) async {
+    await db.skipDay(reminderId, date);
     await refresh();
     await NotificationService.rescheduleAll(db);
   }

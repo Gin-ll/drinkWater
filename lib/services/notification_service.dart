@@ -158,10 +158,11 @@ class NotificationService {
           startOn: r.createdAt, // 新建循环从创建当天起算，创建前不设闹钟
         );
         if (occurrence == null) continue; // 今天不触发 → 不设闹钟
-        // 按天临时调整：今天有 override 则用其时间
+        // 按天临时调整/跳过：当天有 override 则用其时间；isSkipped 时当天不设闹钟
         var at = occurrence;
         final ov = await db.overrideFor(r.id, toDateString(today));
         if (ov != null) {
+          if (ov.isSkipped) continue; // 当天被跳过（首页删除今天）
           at = DateTime(today.year, today.month, today.day, ov.hour, ov.minute);
         }
         if (!at.isAfter(now)) continue; // 已错过 → 仅保留数据

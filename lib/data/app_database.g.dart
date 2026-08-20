@@ -1308,12 +1308,28 @@ class $ReminderOverridesTable extends ReminderOverrides
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isSkippedMeta = const VerificationMeta(
+    'isSkipped',
+  );
+  @override
+  late final GeneratedColumn<bool> isSkipped = GeneratedColumn<bool>(
+    'is_skipped',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_skipped" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     reminderId,
     overriddenOn,
     hour,
     minute,
+    isSkipped,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1362,6 +1378,12 @@ class $ReminderOverridesTable extends ReminderOverrides
     } else if (isInserting) {
       context.missing(_minuteMeta);
     }
+    if (data.containsKey('is_skipped')) {
+      context.handle(
+        _isSkippedMeta,
+        isSkipped.isAcceptableOrUnknown(data['is_skipped']!, _isSkippedMeta),
+      );
+    }
     return context;
   }
 
@@ -1387,6 +1409,10 @@ class $ReminderOverridesTable extends ReminderOverrides
         DriftSqlType.int,
         data['${effectivePrefix}minute'],
       )!,
+      isSkipped: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_skipped'],
+      )!,
     );
   }
 
@@ -1402,11 +1428,13 @@ class ReminderOverride extends DataClass
   final String overriddenOn;
   final int hour;
   final int minute;
+  final bool isSkipped;
   const ReminderOverride({
     required this.reminderId,
     required this.overriddenOn,
     required this.hour,
     required this.minute,
+    required this.isSkipped,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1415,6 +1443,7 @@ class ReminderOverride extends DataClass
     map['overridden_on'] = Variable<String>(overriddenOn);
     map['hour'] = Variable<int>(hour);
     map['minute'] = Variable<int>(minute);
+    map['is_skipped'] = Variable<bool>(isSkipped);
     return map;
   }
 
@@ -1424,6 +1453,7 @@ class ReminderOverride extends DataClass
       overriddenOn: Value(overriddenOn),
       hour: Value(hour),
       minute: Value(minute),
+      isSkipped: Value(isSkipped),
     );
   }
 
@@ -1437,6 +1467,7 @@ class ReminderOverride extends DataClass
       overriddenOn: serializer.fromJson<String>(json['overriddenOn']),
       hour: serializer.fromJson<int>(json['hour']),
       minute: serializer.fromJson<int>(json['minute']),
+      isSkipped: serializer.fromJson<bool>(json['isSkipped']),
     );
   }
   @override
@@ -1447,6 +1478,7 @@ class ReminderOverride extends DataClass
       'overriddenOn': serializer.toJson<String>(overriddenOn),
       'hour': serializer.toJson<int>(hour),
       'minute': serializer.toJson<int>(minute),
+      'isSkipped': serializer.toJson<bool>(isSkipped),
     };
   }
 
@@ -1455,11 +1487,13 @@ class ReminderOverride extends DataClass
     String? overriddenOn,
     int? hour,
     int? minute,
+    bool? isSkipped,
   }) => ReminderOverride(
     reminderId: reminderId ?? this.reminderId,
     overriddenOn: overriddenOn ?? this.overriddenOn,
     hour: hour ?? this.hour,
     minute: minute ?? this.minute,
+    isSkipped: isSkipped ?? this.isSkipped,
   );
   ReminderOverride copyWithCompanion(ReminderOverridesCompanion data) {
     return ReminderOverride(
@@ -1471,6 +1505,7 @@ class ReminderOverride extends DataClass
           : this.overriddenOn,
       hour: data.hour.present ? data.hour.value : this.hour,
       minute: data.minute.present ? data.minute.value : this.minute,
+      isSkipped: data.isSkipped.present ? data.isSkipped.value : this.isSkipped,
     );
   }
 
@@ -1480,13 +1515,15 @@ class ReminderOverride extends DataClass
           ..write('reminderId: $reminderId, ')
           ..write('overriddenOn: $overriddenOn, ')
           ..write('hour: $hour, ')
-          ..write('minute: $minute')
+          ..write('minute: $minute, ')
+          ..write('isSkipped: $isSkipped')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(reminderId, overriddenOn, hour, minute);
+  int get hashCode =>
+      Object.hash(reminderId, overriddenOn, hour, minute, isSkipped);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1494,7 +1531,8 @@ class ReminderOverride extends DataClass
           other.reminderId == this.reminderId &&
           other.overriddenOn == this.overriddenOn &&
           other.hour == this.hour &&
-          other.minute == this.minute);
+          other.minute == this.minute &&
+          other.isSkipped == this.isSkipped);
 }
 
 class ReminderOverridesCompanion extends UpdateCompanion<ReminderOverride> {
@@ -1502,12 +1540,14 @@ class ReminderOverridesCompanion extends UpdateCompanion<ReminderOverride> {
   final Value<String> overriddenOn;
   final Value<int> hour;
   final Value<int> minute;
+  final Value<bool> isSkipped;
   final Value<int> rowid;
   const ReminderOverridesCompanion({
     this.reminderId = const Value.absent(),
     this.overriddenOn = const Value.absent(),
     this.hour = const Value.absent(),
     this.minute = const Value.absent(),
+    this.isSkipped = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ReminderOverridesCompanion.insert({
@@ -1515,6 +1555,7 @@ class ReminderOverridesCompanion extends UpdateCompanion<ReminderOverride> {
     required String overriddenOn,
     required int hour,
     required int minute,
+    this.isSkipped = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : reminderId = Value(reminderId),
        overriddenOn = Value(overriddenOn),
@@ -1525,6 +1566,7 @@ class ReminderOverridesCompanion extends UpdateCompanion<ReminderOverride> {
     Expression<String>? overriddenOn,
     Expression<int>? hour,
     Expression<int>? minute,
+    Expression<bool>? isSkipped,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1532,6 +1574,7 @@ class ReminderOverridesCompanion extends UpdateCompanion<ReminderOverride> {
       if (overriddenOn != null) 'overridden_on': overriddenOn,
       if (hour != null) 'hour': hour,
       if (minute != null) 'minute': minute,
+      if (isSkipped != null) 'is_skipped': isSkipped,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1541,6 +1584,7 @@ class ReminderOverridesCompanion extends UpdateCompanion<ReminderOverride> {
     Value<String>? overriddenOn,
     Value<int>? hour,
     Value<int>? minute,
+    Value<bool>? isSkipped,
     Value<int>? rowid,
   }) {
     return ReminderOverridesCompanion(
@@ -1548,6 +1592,7 @@ class ReminderOverridesCompanion extends UpdateCompanion<ReminderOverride> {
       overriddenOn: overriddenOn ?? this.overriddenOn,
       hour: hour ?? this.hour,
       minute: minute ?? this.minute,
+      isSkipped: isSkipped ?? this.isSkipped,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1567,6 +1612,9 @@ class ReminderOverridesCompanion extends UpdateCompanion<ReminderOverride> {
     if (minute.present) {
       map['minute'] = Variable<int>(minute.value);
     }
+    if (isSkipped.present) {
+      map['is_skipped'] = Variable<bool>(isSkipped.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1580,6 +1628,7 @@ class ReminderOverridesCompanion extends UpdateCompanion<ReminderOverride> {
           ..write('overriddenOn: $overriddenOn, ')
           ..write('hour: $hour, ')
           ..write('minute: $minute, ')
+          ..write('isSkipped: $isSkipped, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2601,6 +2650,7 @@ typedef $$ReminderOverridesTableCreateCompanionBuilder =
       required String overriddenOn,
       required int hour,
       required int minute,
+      Value<bool> isSkipped,
       Value<int> rowid,
     });
 typedef $$ReminderOverridesTableUpdateCompanionBuilder =
@@ -2609,6 +2659,7 @@ typedef $$ReminderOverridesTableUpdateCompanionBuilder =
       Value<String> overriddenOn,
       Value<int> hour,
       Value<int> minute,
+      Value<bool> isSkipped,
       Value<int> rowid,
     });
 
@@ -2667,6 +2718,11 @@ class $$ReminderOverridesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get isSkipped => $composableBuilder(
+    column: $table.isSkipped,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$RemindersTableFilterComposer get reminderId {
     final $$RemindersTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -2715,6 +2771,11 @@ class $$ReminderOverridesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isSkipped => $composableBuilder(
+    column: $table.isSkipped,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$RemindersTableOrderingComposer get reminderId {
     final $$RemindersTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -2758,6 +2819,9 @@ class $$ReminderOverridesTableAnnotationComposer
 
   GeneratedColumn<int> get minute =>
       $composableBuilder(column: $table.minute, builder: (column) => column);
+
+  GeneratedColumn<bool> get isSkipped =>
+      $composableBuilder(column: $table.isSkipped, builder: (column) => column);
 
   $$RemindersTableAnnotationComposer get reminderId {
     final $$RemindersTableAnnotationComposer composer = $composerBuilder(
@@ -2820,12 +2884,14 @@ class $$ReminderOverridesTableTableManager
                 Value<String> overriddenOn = const Value.absent(),
                 Value<int> hour = const Value.absent(),
                 Value<int> minute = const Value.absent(),
+                Value<bool> isSkipped = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReminderOverridesCompanion(
                 reminderId: reminderId,
                 overriddenOn: overriddenOn,
                 hour: hour,
                 minute: minute,
+                isSkipped: isSkipped,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2834,12 +2900,14 @@ class $$ReminderOverridesTableTableManager
                 required String overriddenOn,
                 required int hour,
                 required int minute,
+                Value<bool> isSkipped = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReminderOverridesCompanion.insert(
                 reminderId: reminderId,
                 overriddenOn: overriddenOn,
                 hour: hour,
                 minute: minute,
+                isSkipped: isSkipped,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
