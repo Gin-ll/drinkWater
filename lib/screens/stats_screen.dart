@@ -62,11 +62,18 @@ class _StatsScreenState extends State<StatsScreen> {
   String get _rangeLabel {
     final (start, end) = _range;
     return switch (_mode) {
-      _RangeMode.week =>
-        '${start.month}月${start.day}日 - ${end.day - 1}日',
+      // 周：只显示第几周，不需要范围
+      _RangeMode.week => '第${_isoWeekNumber(start)}周',
       _RangeMode.month => '${_anchor.year}年${_anchor.month}月',
       _RangeMode.year => '${_anchor.year}年',
     };
+  }
+
+  /// ISO 8601 年第几周
+  int _isoWeekNumber(DateTime date) {
+    final thursday = date.add(Duration(days: DateTime.thursday - date.weekday));
+    final yearStart = DateTime(thursday.year, 1, 1);
+    return (thursday.difference(yearStart).inDays / 7).floor() + 1;
   }
 
   Future<void> _load() async {
@@ -209,11 +216,13 @@ class _StatsScreenState extends State<StatsScreen> {
                                       counts: _counts,
                                       days: days,
                                       barWidth: _isYear ? 4 : 10,
+                                      mode: _mode,
                                     )
                                   : _LineChart(
                                       counts: _counts,
                                       days: days,
                                       showDots: days.length <= 40,
+                                      mode: _mode,
                                     ),
                             ),
                           ),
@@ -294,12 +303,40 @@ class _StatItem extends StatelessWidget {
   }
 }
 
+/// X 轴刻度文案：周=周一~周日，月=几号，年=月份
+String _xAxisLabel(DateTime d, _RangeMode mode) {
+  return switch (mode) {
+    _RangeMode.week => weekNames[d.weekday - 1],
+    _RangeMode.month => '${d.day}',
+    _RangeMode.year => '${d.month}月',
+  };
+}
+
+/// 是否显示该 X 轴刻度
+bool _shouldShowX(DateTime d, _RangeMode mode) {
+  switch (mode) {
+    case _RangeMode.week:
+      return true; // 周一~周日全显示
+    case _RangeMode.month:
+      return true; // 几号几号（图表可横向滚动）
+    case _RangeMode.year:
+      return d.day == 1; // 每年只标各月份
+  }
+}
+
+/// 选中提示的日期文案
+String _tooltipLabel(DateTime d, _RangeMode mode) {
+  if (mode == _RangeMode.week) return weekNames[d.weekday - 1];
+  return '${d.month}月${d.day}日';
+}
+
 class _BarChart extends StatelessWidget {
   final Map<String, int> counts;
   final List<DateTime> days;
   final double barWidth;
+  final _RangeMode mode;
 
-  const _BarChart({required this.counts, required this.days, required this.barWidth});
+  const _BarChart({required this.counts, required this.days, required this.barWidth, required this.mode});
 
   @override
   Widget build(BuildContext context) {
@@ -330,6 +367,18 @@ class _BarChart extends StatelessWidget {
           horizontalInterval: (maxVal == 0 ? 1 : maxVal).toDouble(),
           getDrawingHorizontalLine: (_) => const FlLine(color: Colors.black12, strokeWidth: 1),
         ),
+        // 点击某根柱子：显示当天日期 + 喝水次数
+        barTouchData: BarTouchData(
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              final d = days[group.x];
+              return BarTooltipItem(
+                '${_tooltipLabel(d, mode)}\n${rod.toY.toInt()} 次',
+                const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+              );
+            },
+          ),
+        ),
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -340,6 +389,8 @@ class _BarChart extends StatelessWidget {
                   Text(v.toInt().toString(), style: const TextStyle(fontSize: 10)),
             ),
           ),
+          // 顶部不需要 X 轴
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -348,16 +399,11 @@ class _BarChart extends StatelessWidget {
               getTitlesWidget: (v, meta) {
                 final i = v.toInt();
                 if (i < 0 || i >= days.length) return const SizedBox.shrink();
-                if (days.length > 45 && i % 15 != 0) return const SizedBox.shrink();
-                if (days.length > 15 && days.length <= 45 && i % 7 != 0) {
-                  return const SizedBox.shrink();
-                }
+                final d = days[i];
+                if (!_shouldShowX(d, mode)) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    _isYearMode() ? '${days[i].month}/${days[i].day}' : '${days[i].day}',
-                    style: const TextStyle(fontSize: 9),
-                  ),
+                  child: Text(_xAxisLabel(d, mode), style: const TextStyle(fontSize: 9)),
                 );
               },
             ),
@@ -367,16 +413,15 @@ class _BarChart extends StatelessWidget {
       ),
     );
   }
-
-  bool _isYearMode() => days.length > 45;
 }
 
 class _LineChart extends StatelessWidget {
   final Map<String, int> counts;
   final List<DateTime> days;
   final bool showDots;
+  final _RangeMode mode;
 
-  const _LineChart({required this.counts, required this.days, required this.showDots});
+  const _LineChart({required this.counts, required this.days, required this.showDots, required this.mode});
 
   @override
   Widget build(BuildContext context) {
@@ -406,6 +451,18 @@ class _LineChart extends StatelessWidget {
         ],
         gridData: FlGridData(show: false),
         borderData: FlBorderData(show: false),
+        // 点击折线上某点：显示当天日期 + 喝水次数
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touchedSpots) => [
+              for (final s in touchedSpots)
+                LineTooltipItem(
+                  '${_tooltipLabel(days[s.x.toInt()], mode)}\n${s.y.toInt()} 次',
+                  const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+            ],
+          ),
+        ),
         titlesData: FlTitlesData(
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -414,21 +471,21 @@ class _LineChart extends StatelessWidget {
               interval: (maxVal == 0 ? 1 : maxVal).toDouble(),
             ),
           ),
+          // 顶部不需要 X 轴
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 24,
-              interval: (days.length > 45 ? 15 : days.length > 15 ? 7 : 1).toDouble(),
               getTitlesWidget: (v, meta) {
                 final i = v.toInt();
                 if (i < 0 || i >= days.length) return const SizedBox.shrink();
+                final d = days[i];
+                if (!_shouldShowX(d, mode)) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    days.length > 45 ? '${days[i].month}/${days[i].day}' : '${days[i].day}',
-                    style: const TextStyle(fontSize: 9),
-                  ),
+                  child: Text(_xAxisLabel(d, mode), style: const TextStyle(fontSize: 9)),
                 );
               },
             ),
