@@ -39,12 +39,49 @@ class AppNotifier extends ChangeNotifier {
 
   bool get loaded => true; // 占位：始终视为就绪
 
-  /// 初始化：打开库、装载数据、注册调度。
+  /// 初始化：打开库、装载数据、示例数据（首次）、注册调度。
   Future<void> init({bool schedule = true}) async {
     db = _injectedDb ?? await openAppDatabase();
     await refresh();
     NotificationService.onActionApplied = refresh;
+    await _ensureSampleData();
     if (schedule) await NotificationService.rescheduleAll(db);
+  }
+
+  /// 首次启动（提醒列表为空）时写入一组合理的示例喝水提醒，仅一次。
+  Future<void> _ensureSampleData() async {
+    final seeded = (await db.getSetting('seeded')) == '1';
+    final existing = await db.getAllReminders();
+    if (!seeded && existing.isEmpty) {
+      final now = DateTime.now();
+      const samples = <(String, int, int)>[
+        ('晨起第一杯', 8, 0),
+        ('上午补水', 10, 0),
+        ('餐前一杯', 12, 0),
+        ('下午补水', 14, 30),
+        ('下班前一杯', 17, 0),
+        ('晚间补水', 20, 30),
+      ];
+      for (final s in samples) {
+        await db.insertReminder(
+          RemindersCompanion.insert(
+            title: Value(s.$1),
+            body: const Value(''),
+            repeatType: repeatDaily,
+            hour: s.$2,
+            minute: s.$3,
+            weekdays: const Value(''),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      }
+      await db.setSetting('seeded', '1');
+      await refresh();
+    } else if (existing.isNotEmpty && !seeded) {
+      // 已有数据视为已初始化，不再写入示例
+      await db.setSetting('seeded', '1');
+    }
   }
 
   /// 重新装载数据并通知界面刷新。
