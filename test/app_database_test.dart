@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:drink_water/data/app_database.dart';
+import 'package:drink_water/services/occurrence_calculator.dart';
 import 'package:drink_water/theme.dart';
 
 void main() {
@@ -118,6 +119,48 @@ void main() {
       expect(counts['2026-08-19'], 2);
       expect(counts['2026-08-20'], 1); // 未喝不计
       expect(counts.containsKey('2026-08-21'), isFalse);
+    });
+  });
+
+  group('同刻去重 hasConflictAtTime', () {
+    test('当天同刻冲突判定', () async {
+      final now = DateTime.now();
+      await db.insertReminder(
+        RemindersCompanion.insert(
+          title: const Value('9点'),
+          repeatType: repeatDaily,
+          hour: 9,
+          minute: 0,
+          weekdays: const Value(''),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      final reminders = await db.getAllReminders();
+      final day = DateTime(now.year, now.month, now.day);
+      expect(hasConflictAtTime(reminders, 9, 0, day), isTrue);
+      expect(hasConflictAtTime(reminders, 10, 0, day), isFalse);
+      expect(hasConflictAtTime(reminders, 9, 0, day, excludeId: reminders.first.id), isFalse);
+    });
+
+    test('每周型不含当天不冲突', () async {
+      final now = DateTime.now();
+      await db.insertReminder(
+        RemindersCompanion.insert(
+          title: const Value('周一9点'),
+          repeatType: repeatWeekly,
+          hour: 9,
+          minute: 0,
+          weekdays: Value(AppDatabase.encodeWeekdays([DateTime.monday])),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      final reminders = await db.getAllReminders();
+      final monday = DateTime(2026, 8, 24); // 周一
+      final tuesday = DateTime(2026, 8, 25); // 周二
+      expect(hasConflictAtTime(reminders, 9, 0, monday), isTrue);
+      expect(hasConflictAtTime(reminders, 9, 0, tuesday), isFalse);
     });
   });
 

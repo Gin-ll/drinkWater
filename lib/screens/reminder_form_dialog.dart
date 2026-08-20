@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../data/app_database.dart';
+import '../services/occurrence_calculator.dart';
 import '../state/app_notifier.dart';
 import '../utils/format.dart';
 
@@ -123,6 +124,34 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  /// 同刻去重提示：若当天该时刻已有启用提醒，弹出「是否仍要添加」确认。
+  /// 返回 true 表示可以继续保存。
+  Future<bool> _ensureNoTimeConflict(int hour, int minute) async {
+    final app = context.read<AppNotifier>();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final hasConflict = hasConflictAtTime(
+      app.reminders,
+      hour,
+      minute,
+      today,
+      excludeId: _isEdit ? widget.reminder!.id : null,
+    );
+    if (!hasConflict) return true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('重复提醒'),
+        content: Text('当天 ${formatTime(hour, minute)} 已有喝水提醒\n是否仍要添加？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('仍要添加')),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
   Future<void> _save() async {
     final app = context.read<AppNotifier>();
     final nav = Navigator.of(context);
@@ -142,6 +171,8 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
         _toast('一次性提醒时间必须晚于当前时间');
         return;
       }
+      // 同刻去重提示
+      if (!await _ensureNoTimeConflict(triggerAt.hour, triggerAt.minute)) return;
       if (_isEdit) {
         await app.updateReminder(widget.reminder!.id,
             title: title, body: widget.reminder!.body,
@@ -158,6 +189,8 @@ class _ReminderFormDialogState extends State<ReminderFormDialog> {
         _toast('每周循环请至少选择一天');
         return;
       }
+      // 同刻去重提示
+      if (!await _ensureNoTimeConflict(_time.hour, _time.minute)) return;
       if (_isEdit) {
         await app.updateReminder(widget.reminder!.id,
             title: title, body: widget.reminder!.body,

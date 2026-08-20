@@ -166,6 +166,31 @@ DateTime? occurrenceOnDay({
   return null;
 }
 
+/// 判断提醒列表中是否已有「当天同一时刻」的启用提醒（用于新建/编辑时的去重提示）。
+bool hasConflictAtTime(
+  List<Reminder> reminders,
+  int hour,
+  int minute,
+  DateTime day, {
+  int? excludeId,
+}) {
+  for (final r in reminders) {
+    if (!r.enabled) continue;
+    if (excludeId != null && r.id == excludeId) continue;
+    final occ = occurrenceOnDay(
+      repeatType: r.repeatType,
+      hour: r.hour,
+      minute: r.minute,
+      weekdays: AppDatabase.decodeWeekdays(r.weekdays),
+      monthDay: r.monthDay,
+      triggerAt: r.triggerAt == null ? null : DateTime.fromMillisecondsSinceEpoch(r.triggerAt!),
+      day: day,
+    );
+    if (occ != null && occ.hour == hour && occ.minute == minute) return true;
+  }
+  return false;
+}
+
 /// 格式化为 YYYY-MM-DD（本地日期字符串）
 String toDateString(DateTime t) {
   final m = t.month.toString().padLeft(2, '0');
