@@ -7,7 +7,7 @@ import '../services/occurrence_calculator.dart';
 import '../state/app_notifier.dart';
 import '../utils/format.dart';
 
-/// 统计页：周/月视图的柱状图、折线图与日历钻取
+/// 统计页：周/月/年 三种时间范围，柱状图与折线图合并展示并可切换
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
 
@@ -15,9 +15,14 @@ class StatsScreen extends StatefulWidget {
   State<StatsScreen> createState() => _StatsScreenState();
 }
 
+enum _RangeMode { week, month, year }
+
+enum _ChartKind { bar, line }
+
 class _StatsScreenState extends State<StatsScreen> {
-  bool _weekMode = true;
-  DateTime _anchor = DateTime.now();
+  _RangeMode _mode = _RangeMode.week; // 默认本周（年视图从今年起）
+  _ChartKind _chart = _ChartKind.bar;
+  DateTime _anchor = DateTime.now(); // 周=该周任一日期 / 月=某月 / 年=某年
   Map<String, int> _counts = {};
   bool _loading = true;
 
@@ -27,16 +32,41 @@ class _StatsScreenState extends State<StatsScreen> {
     _load();
   }
 
+  bool get _isYear => _mode == _RangeMode.year;
+
   /// 当前统计区间（开区间 end 为区间后一天）
   (DateTime, DateTime) get _range {
-    if (_weekMode) {
-      final weekStart = _anchor.subtract(Duration(days: _anchor.weekday - 1));
-      return (weekStart, weekStart.add(const Duration(days: 7)));
+    switch (_mode) {
+      case _RangeMode.week:
+        final weekStart = _anchor.subtract(Duration(days: _anchor.weekday - 1));
+        return (weekStart, weekStart.add(const Duration(days: 7)));
+      case _RangeMode.month:
+        return (
+          DateTime(_anchor.year, _anchor.month, 1),
+          DateTime(_anchor.year, _anchor.month + 1, 1),
+        );
+      case _RangeMode.year:
+        return (DateTime(_anchor.year, 1, 1), DateTime(_anchor.year + 1, 1, 1));
     }
-    return (
-      DateTime(_anchor.year, _anchor.month, 1),
-      DateTime(_anchor.year, _anchor.month + 1, 1),
-    );
+  }
+
+  List<DateTime> get _days {
+    final (start, end) = _range;
+    final days = <DateTime>[];
+    for (var d = start; d.isBefore(end); d = d.add(const Duration(days: 1))) {
+      days.add(d);
+    }
+    return days;
+  }
+
+  String get _rangeLabel {
+    final (start, end) = _range;
+    return switch (_mode) {
+      _RangeMode.week =>
+        '${start.month}月${start.day}日 - ${end.day - 1}日',
+      _RangeMode.month => '${_anchor.year}年${_anchor.month}月',
+      _RangeMode.year => '${_anchor.year}年',
+    };
   }
 
   Future<void> _load() async {
@@ -54,9 +84,11 @@ class _StatsScreenState extends State<StatsScreen> {
 
   void _shift(int step) {
     setState(() {
-      _anchor = _weekMode
-          ? _anchor.add(Duration(days: 7 * step))
-          : DateTime(_anchor.year, _anchor.month + step, 1);
+      _anchor = switch (_mode) {
+        _RangeMode.week => _anchor.add(Duration(days: 7 * step)),
+        _RangeMode.month => DateTime(_anchor.year, _anchor.month + step, 1),
+        _RangeMode.year => DateTime(_anchor.year + step, 1, 1),
+      };
     });
     _load();
   }
@@ -71,13 +103,6 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  String get _rangeLabel {
-    final (start, end) = _range;
-    final endDay = end.subtract(const Duration(days: 1));
-    if (_weekMode) return '${start.month}月${start.day}日 - ${endDay.month}月${endDay.day}日';
-    return '${_anchor.year}年${_anchor.month}月';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -87,47 +112,118 @@ class _StatsScreenState extends State<StatsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // 顶部：周期切换 | ◀ 区间时间 ▶（时间位于两个切换按钮中间）
             Row(
               children: [
-                SegmentedButton<bool>(
+                SegmentedButton<_RangeMode>(
                   segments: const [
-                    ButtonSegment(value: true, label: Text('周')),
-                    ButtonSegment(value: false, label: Text('月')),
+                    ButtonSegment(value: _RangeMode.week, label: Text('周')),
+                    ButtonSegment(value: _RangeMode.month, label: Text('月')),
+                    ButtonSegment(value: _RangeMode.year, label: Text('年')),
                   ],
-                  selected: {_weekMode},
+                  selected: {_mode},
                   onSelectionChanged: (s) {
-                    setState(() => _weekMode = s.first);
+                    setState(() => _mode = s.first);
                     _load();
                   },
                 ),
-                // 区间标签弹性伸缩 + 省略号，避免窄屏/长文案溢出
                 Expanded(
-                  child: Center(
-                    child: Text(
-                      _rangeLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: () => _shift(-1),
+                        icon: const Icon(Icons.chevron_left),
+                        tooltip: '上一区间',
+                      ),
+                      Flexible(
+                        child: Text(
+                          _rangeLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => _shift(1),
+                        icon: const Icon(Icons.chevron_right),
+                        tooltip: '下一区间',
+                      ),
+                    ],
                   ),
                 ),
-                IconButton(onPressed: () => _shift(-1), icon: const Icon(Icons.chevron_left)),
-                IconButton(onPressed: () => _shift(1), icon: const Icon(Icons.chevron_right)),
               ],
             ),
             const SizedBox(height: 16),
             if (_loading)
               const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
             else ...[
-              _SummaryCard(counts: _counts, weekMode: _weekMode),
+              _SummaryCard(counts: _counts, mode: _mode),
               const SizedBox(height: 16),
-              Text('每日喝水次数（柱状图）', style: _sectionStyle()),
-              const SizedBox(height: 8),
-              _BarChartCard(counts: _counts, days: _daysOfRange),
-              const SizedBox(height: 16),
-              Text('每日喝水趋势（折线图）', style: _sectionStyle()),
-              const SizedBox(height: 8),
-              _LineChartCard(counts: _counts, days: _daysOfRange),
+              // 每日喝水统计：柱状/折线合并卡片，右上角切换
+              Card(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Row(
+                        children: [
+                          const Text('每日喝水统计',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                          const Spacer(),
+                          SegmentedButton<_ChartKind>(
+                            style: const ButtonStyle(
+                              visualDensity: VisualDensity.compact,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            showSelectedIcon: false,
+                            segments: const [
+                              ButtonSegment(value: _ChartKind.bar, icon: Icon(Icons.bar_chart, size: 18)),
+                              ButtonSegment(value: _ChartKind.line, icon: Icon(Icons.show_chart, size: 18)),
+                            ],
+                            selected: {_chart},
+                            onSelectionChanged: (s) => setState(() => _chart = s.first),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // 月/年视图下图表可横向滚动
+                    LayoutBuilder(
+                      builder: (context, cons) {
+                        final days = _days;
+                        final cellWidth = _isYear
+                            ? 14.0
+                            : (_mode == _RangeMode.month ? 36.0 : 20.0);
+                        final totalWidth = (days.length * cellWidth)
+                            .clamp(cons.maxWidth - 32, double.infinity)
+                            .toDouble();
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SizedBox(
+                            width: totalWidth,
+                            height: 200,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                              child: _chart == _ChartKind.bar
+                                  ? _BarChart(
+                                      counts: _counts,
+                                      days: days,
+                                      barWidth: _isYear ? 4 : 10,
+                                    )
+                                  : _LineChart(
+                                      counts: _counts,
+                                      days: days,
+                                      showDots: days.length <= 40,
+                                    ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
               Text('日历（点击查看当天明细）', style: _sectionStyle()),
               const SizedBox(height: 8),
@@ -144,15 +240,6 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  List<DateTime> get _daysOfRange {
-    final (start, end) = _range;
-    final days = <DateTime>[];
-    for (var d = start; d.isBefore(end); d = d.add(const Duration(days: 1))) {
-      days.add(d);
-    }
-    return days;
-  }
-
   TextStyle _sectionStyle() {
     return const TextStyle(fontSize: 15, fontWeight: FontWeight.w700);
   }
@@ -160,21 +247,26 @@ class _StatsScreenState extends State<StatsScreen> {
 
 class _SummaryCard extends StatelessWidget {
   final Map<String, int> counts;
-  final bool weekMode;
+  final _RangeMode mode;
 
-  const _SummaryCard({required this.counts, required this.weekMode});
+  const _SummaryCard({required this.counts, required this.mode});
 
   @override
   Widget build(BuildContext context) {
     final total = counts.values.fold<int>(0, (a, b) => a + b);
     final maxDay = counts.values.isEmpty ? 0 : counts.values.fold<int>(0, (a, b) => a > b ? a : b);
+    final label = switch (mode) {
+      _RangeMode.week => '本周喝水',
+      _RangeMode.month => '本月喝水',
+      _RangeMode.year => '本年喝水',
+    };
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _StatItem(label: weekMode ? '本周喝水' : '本月喝水', value: '$total 次'),
+            _StatItem(label: label, value: '$total 次'),
             _StatItem(label: '单日最高', value: '$maxDay 次'),
           ],
         ),
@@ -202,11 +294,12 @@ class _StatItem extends StatelessWidget {
   }
 }
 
-class _BarChartCard extends StatelessWidget {
+class _BarChart extends StatelessWidget {
   final Map<String, int> counts;
   final List<DateTime> days;
+  final double barWidth;
 
-  const _BarChartCard({required this.counts, required this.days});
+  const _BarChart({required this.counts, required this.days, required this.barWidth});
 
   @override
   Widget build(BuildContext context) {
@@ -219,75 +312,71 @@ class _BarChartCard extends StatelessWidget {
           barRods: [
             BarChartRodData(
               toY: (counts[toDateString(days[i])] ?? 0).toDouble(),
-              width: days.length > 31 ? 3 : 8,
+              width: barWidth,
               color: color,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
             ),
           ],
         ),
     ];
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: SizedBox(
-          height: 180,
-          child: BarChart(
-            BarChartData(
-              maxY: (maxVal == 0 ? 1 : maxVal).toDouble(),
-              alignment: BarChartAlignment.spaceAround,
-              borderData: FlBorderData(show: false),
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: (maxVal == 0 ? 1 : maxVal).toDouble(),
-                getDrawingHorizontalLine: (_) => const FlLine(color: Colors.black12, strokeWidth: 1),
-              ),
-              titlesData: _barTitles(maxVal),
-              barGroups: groups,
+    return BarChart(
+      BarChartData(
+        maxY: (maxVal == 0 ? 1 : maxVal).toDouble(),
+        alignment: BarChartAlignment.spaceAround,
+        borderData: FlBorderData(show: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: (maxVal == 0 ? 1 : maxVal).toDouble(),
+          getDrawingHorizontalLine: (_) => const FlLine(color: Colors.black12, strokeWidth: 1),
+        ),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 28,
+              interval: (maxVal == 0 ? 1 : maxVal).toDouble(),
+              getTitlesWidget: (v, meta) =>
+                  Text(v.toInt().toString(), style: const TextStyle(fontSize: 10)),
+            ),
+          ),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 24,
+              getTitlesWidget: (v, meta) {
+                final i = v.toInt();
+                if (i < 0 || i >= days.length) return const SizedBox.shrink();
+                if (days.length > 45 && i % 15 != 0) return const SizedBox.shrink();
+                if (days.length > 15 && days.length <= 45 && i % 7 != 0) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    _isYearMode() ? '${days[i].month}/${days[i].day}' : '${days[i].day}',
+                    style: const TextStyle(fontSize: 9),
+                  ),
+                );
+              },
             ),
           ),
         ),
+        barGroups: groups,
       ),
     );
   }
 
-  FlTitlesData _barTitles(int maxVal) {
-    // 显示有限数量的横轴标签，避免过密
-    final step = days.length > 16 ? 2 : 1;
-    return FlTitlesData(
-      leftTitles: AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 28,
-          interval: (maxVal == 0 ? 1 : maxVal).toDouble(),
-          getTitlesWidget: (v, meta) => Text(v.toInt().toString(), style: const TextStyle(fontSize: 10)),
-        ),
-      ),
-      bottomTitles: AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 24,
-          interval: step.toDouble(),
-          getTitlesWidget: (v, meta) {
-            final i = v.toInt();
-            if (i < 0 || i >= days.length) return const SizedBox.shrink();
-            if (i % step != 0) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text('${(days[i].month)}/${days[i].day}', style: const TextStyle(fontSize: 9)),
-            );
-          },
-        ),
-      ),
-    );
-  }
+  bool _isYearMode() => days.length > 45;
 }
 
-class _LineChartCard extends StatelessWidget {
+class _LineChart extends StatelessWidget {
   final Map<String, int> counts;
   final List<DateTime> days;
+  final bool showDots;
 
-  const _LineChartCard({required this.counts, required this.days});
+  const _LineChart({required this.counts, required this.days, required this.showDots});
 
   @override
   Widget build(BuildContext context) {
@@ -297,55 +386,53 @@ class _LineChartCard extends StatelessWidget {
       for (var i = 0; i < days.length; i++)
         FlSpot(i.toDouble(), (counts[toDateString(days[i])] ?? 0).toDouble()),
     ];
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: SizedBox(
-          height: 180,
-          child: LineChart(
-            LineChartData(
-              minX: 0,
-              maxX: (days.length - 1).toDouble(),
-              minY: 0,
-              maxY: (maxVal == 0 ? 1 : maxVal).toDouble(),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: spots,
-                  isCurved: true,
-                  color: color,
-                  barWidth: 2,
-                  dotData: FlDotData(show: days.length <= 31, getDotPainter: (s, p, b, i) =>
-                      FlDotCirclePainter(radius: 3, color: color)),
-                ),
-              ],
-              gridData: FlGridData(show: false),
-              borderData: FlBorderData(show: false),
-              titlesData: _lineTitles(maxVal),
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: (days.length - 1).toDouble(),
+        minY: 0,
+        maxY: (maxVal == 0 ? 1 : maxVal).toDouble(),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: color,
+            barWidth: 2,
+            dotData: FlDotData(
+              show: showDots,
+              getDotPainter: (s, p, b, i) => FlDotCirclePainter(radius: 3, color: color),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  FlTitlesData _lineTitles(int maxVal) {
-    final step = days.length > 16 ? 2 : 1;
-    return FlTitlesData(
-      leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28, interval: (maxVal == 0 ? 1 : maxVal).toDouble())),
-      bottomTitles: AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 24,
-          interval: step.toDouble(),
-          getTitlesWidget: (v, meta) {
-            final i = v.toInt();
-            if (i < 0 || i >= days.length) return const SizedBox.shrink();
-            if (i % step != 0) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text('${days[i].day}', style: const TextStyle(fontSize: 9)),
-            );
-          },
+        ],
+        gridData: FlGridData(show: false),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 28,
+              interval: (maxVal == 0 ? 1 : maxVal).toDouble(),
+            ),
+          ),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 24,
+              interval: (days.length > 45 ? 15 : days.length > 15 ? 7 : 1).toDouble(),
+              getTitlesWidget: (v, meta) {
+                final i = v.toInt();
+                if (i < 0 || i >= days.length) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    days.length > 45 ? '${days[i].month}/${days[i].day}' : '${days[i].day}',
+                    style: const TextStyle(fontSize: 9),
+                  ),
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -380,14 +467,17 @@ class _CalendarCard extends StatelessWidget {
             alignment: Alignment.center,
             margin: const EdgeInsets.all(2),
             decoration: BoxDecoration(
-              color: cnt == 0 ? Colors.transparent : color.withValues(alpha: (0.12 + 0.18 * (cnt.clamp(0, 4) / 4)).toDouble()),
+              color: cnt == 0
+                  ? Colors.transparent
+                  : color.withValues(alpha: (0.12 + 0.18 * (cnt.clamp(0, 4) / 4)).toDouble()),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text('$d', style: const TextStyle(fontSize: 12)),
-                Text(cnt > 0 ? '$cnt' : '', style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+                Text(cnt > 0 ? '$cnt' : '',
+                    style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
@@ -400,7 +490,10 @@ class _CalendarCard extends StatelessWidget {
         child: Column(
           children: [
             Row(
-              children: [for (final w in weekNames) Expanded(child: Center(child: Text(w, style: const TextStyle(fontSize: 12, color: Colors.grey))))],
+              children: [
+                for (final w in weekNames)
+                  Expanded(child: Center(child: Text(w, style: const TextStyle(fontSize: 12, color: Colors.grey)))),
+              ],
             ),
             const SizedBox(height: 8),
             GridView.count(
@@ -412,7 +505,8 @@ class _CalendarCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                Container(width: 10, height: 10, decoration: BoxDecoration(color: color.withValues(alpha: 0.15), shape: BoxShape.circle)),
+                Container(width: 10, height: 10,
+                    decoration: BoxDecoration(color: color.withValues(alpha: 0.15), shape: BoxShape.circle)),
                 const SizedBox(width: 6),
                 const Text('次数越多颜色越深', style: TextStyle(fontSize: 11, color: Colors.grey)),
               ],
@@ -440,7 +534,8 @@ class _DayDetailSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(formatDate(parseDate(date)), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(formatDate(parseDate(date)),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             if (sorted.isEmpty)
               const Padding(
@@ -452,10 +547,13 @@ class _DayDetailSheet extends StatelessWidget {
                 final t = log.actionTime;
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(log.isDrank ? Icons.water_drop : Icons.close, color: log.isDrank ? Colors.green : Colors.orange),
+                  leading: Icon(log.isDrank ? Icons.water_drop : Icons.close,
+                      color: log.isDrank ? Colors.green : Colors.orange),
                   title: Text(log.isDrank ? '已喝水' : '未喝水'),
                   subtitle: Text('${formatTime(t.hour, t.minute)} 记录'),
-                  trailing: log.reminderId == null ? null : Text('提醒#${log.reminderId}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  trailing: log.reminderId == null
+                      ? null
+                      : Text('提醒#${log.reminderId}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 );
               }),
           ],
