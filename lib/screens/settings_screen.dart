@@ -64,17 +64,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ButtonSegment(
                     value: themeColorBlue,
                     label: Text('蓝色'),
-                    icon: Icon(Icons.circle, size: 14, color: Color(0xFF3A7BD5)),
+                    icon: Icon(Icons.circle, size: 14, color: Color(0xFF5B8DEF)),
                   ),
                   ButtonSegment(
                     value: themeColorGreen,
                     label: Text('绿色'),
-                    icon: Icon(Icons.circle, size: 14, color: Color(0xFF34A853)),
+                    icon: Icon(Icons.circle, size: 14, color: Color(0xFF4BBC8C)),
                   ),
                   ButtonSegment(
                     value: themeColorYellow,
                     label: Text('黄色'),
-                    icon: Icon(Icons.circle, size: 14, color: Color(0xFFF5A623)),
+                    icon: Icon(Icons.circle, size: 14, color: Color(0xFFFFC457)),
                   ),
                 ],
                 selected: {app.themeColor},

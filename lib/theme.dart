@@ -6,11 +6,12 @@ const String themeColorGreen = 'green';
 const String themeColorYellow = 'yellow';
 
 /// 根据设置返回主题种子色（Material 3 从这里派生整套配色）。
+/// 采用「小清新」柔和色系，避免沉闷。
 Color themeSeedColor(String themeColor) {
   return switch (themeColor) {
-    themeColorGreen => const Color(0xFF34A853), // 清新绿
-    themeColorYellow => const Color(0xFFF5A623), // 暖阳黄
-    _ => const Color(0xFF3A7BD5), // 清爽蓝
+    themeColorGreen => const Color(0xFF4BBC8C), // 清新薄荷绿
+    themeColorYellow => const Color(0xFFFFC457), // 柔暖淡黄
+    _ => const Color(0xFF5B8DEF), // 清爽天蓝
   };
 }
 

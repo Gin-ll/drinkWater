@@ -175,53 +175,54 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (entries.isEmpty) {
                     return const _EmptyState();
                   }
-                  return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                    itemCount: entries.length,
-                    itemBuilder: (context, i) {
-                      final e = entries[i];
-                      final tile = _TimelineTile(
-                        entry: e,
-                        occurDate: toDateString(_day),
-                        onTap: () {
-                          if (e.manual) {
-                            _openEditManual(e);
-                          } else {
-                            _openEdit(e.reminder!);
-                          }
-                        },
-                      );
-                      // 左滑滑出「编辑/删除」图标操作（手动喝水记录走点按编辑弹窗）
-                      if (e.manual) return tile;
-                      return Slidable(
-                        key: ValueKey('tile-${e.reminder!.id}-${e.time.millisecondsSinceEpoch}'),
-                        // 同一 groupTag：同一时间只允许一个卡片滑开（编辑删除）
-                        groupTag: 'timeline',
-                        endActionPane: ActionPane(
-                          motion: const DrawerMotion(),
-                          extentRatio: 0.3,
-                          children: [
-                            SlidableAction(
-                              onPressed: (_) => _openEdit(e.reminder!),
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              foregroundColor: Colors.white,
-                              icon: Icons.edit,
-                              label: '编辑',
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            SlidableAction(
-                              onPressed: (_) => _confirmDelete(e.reminder!),
-                              backgroundColor: const Color(0xFFE5484D),
-                              foregroundColor: Colors.white,
-                              icon: Icons.delete_outline,
-                              label: '删除',
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ],
-                        ),
-                        child: tile,
-                      );
-                    },
+                  // SlidableAutoCloseBehavior：保证同一时刻只允许一个卡片滑开
+                  return SlidableAutoCloseBehavior(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                      itemCount: entries.length,
+                      itemBuilder: (context, i) {
+                        final e = entries[i];
+                        final tile = _TimelineTile(
+                          entry: e,
+                          occurDate: toDateString(_day),
+                          onTap: () {
+                            if (e.manual) {
+                              _openEditManual(e);
+                            } else {
+                              _openEdit(e.reminder!);
+                            }
+                          },
+                        );
+                        // 左滑滑出「编辑/删除」图标操作（手动喝水记录走点按编辑弹窗）
+                        if (e.manual) return tile;
+                        return Slidable(
+                          key: ValueKey('tile-${e.reminder!.id}-${e.time.millisecondsSinceEpoch}'),
+                          endActionPane: ActionPane(
+                            motion: const DrawerMotion(),
+                            extentRatio: 0.3,
+                            children: [
+                              SlidableAction(
+                                onPressed: (_) => _openEdit(e.reminder!),
+                                backgroundColor: Theme.of(context).colorScheme.primary,
+                                foregroundColor: Colors.white,
+                                icon: Icons.edit,
+                                label: '编辑',
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              SlidableAction(
+                                onPressed: (_) => _confirmDelete(e.reminder!),
+                                backgroundColor: const Color(0xFFE5484D),
+                                foregroundColor: Colors.white,
+                                icon: Icons.delete_outline,
+                                label: '删除',
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ],
+                          ),
+                          child: tile,
+                        );
+                      },
+                    ),
                   );
                 },
               ),
@@ -388,7 +389,7 @@ class _TimelineTile extends StatelessWidget {
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(top: 20),
-                      child: _dot(entry.log?.isDrank == true ? Colors.green : colorScheme.primary),
+                      child: _dot(colorScheme.primary),
                     ),
                     Expanded(child: Container(width: 2, color: Colors.black12)),
                   ],
@@ -430,8 +431,8 @@ class _TimelineTile extends StatelessWidget {
                                   isDrank: true,
                                   occurDate: occurDate,
                                 ),
-                                // 杯中有水的图标
-                                icon: const Icon(Icons.local_drink, color: Colors.green),
+                                // 杯中有水的图标，颜色跟随主题
+                                icon: Icon(Icons.local_drink, color: colorScheme.primary),
                               ),
                             ),
                           ],

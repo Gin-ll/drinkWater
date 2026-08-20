@@ -605,7 +605,7 @@ class _DayDetailSheet extends StatelessWidget {
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(log.isDrank ? Icons.local_drink : Icons.close,
-                      color: log.isDrank ? Colors.green : Colors.orange),
+                      color: Theme.of(context).colorScheme.primary),
                   title: Text(log.isDrank ? '已喝水' : '未喝水'),
                   subtitle: Text('${formatTime(t.hour, t.minute)} 记录'),
                   trailing: log.reminderId == null
