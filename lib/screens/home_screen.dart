@@ -195,6 +195,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (e.manual) return tile;
                       return Slidable(
                         key: ValueKey('tile-${e.reminder!.id}-${e.time.millisecondsSinceEpoch}'),
+                        // 同一 groupTag：同一时间只允许一个卡片滑开（编辑删除）
+                        groupTag: 'timeline',
                         endActionPane: ActionPane(
                           motion: const DrawerMotion(),
                           extentRatio: 0.3,
@@ -234,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 50,
                 child: FilledButton.icon(
                   onPressed: _recordDrink,
-                  icon: const Icon(Icons.water_drop),
+                  icon: const Icon(Icons.local_drink),
                   label: const Text('喝水',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
@@ -428,7 +430,8 @@ class _TimelineTile extends StatelessWidget {
                                   isDrank: true,
                                   occurDate: occurDate,
                                 ),
-                                icon: const Icon(Icons.water_drop, color: Colors.green),
+                                // 杯中有水的图标
+                                icon: const Icon(Icons.local_drink, color: Colors.green),
                               ),
                             ),
                           ],

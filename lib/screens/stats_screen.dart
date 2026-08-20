@@ -547,7 +547,7 @@ class _DayDetailSheet extends StatelessWidget {
                 final t = log.actionTime;
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(log.isDrank ? Icons.water_drop : Icons.close,
+                  leading: Icon(log.isDrank ? Icons.local_drink : Icons.close,
                       color: log.isDrank ? Colors.green : Colors.orange),
                   title: Text(log.isDrank ? '已喝水' : '未喝水'),
                   subtitle: Text('${formatTime(t.hour, t.minute)} 记录'),
