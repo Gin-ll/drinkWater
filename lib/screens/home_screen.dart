@@ -8,6 +8,7 @@ import '../data/app_database.dart';
 import '../services/occurrence_calculator.dart';
 import '../state/app_notifier.dart';
 import '../utils/format.dart';
+import '../utils/top_toast.dart';
 import 'reminder_form_dialog.dart';
 
 /// 首页：今日喝水时间轴 + 快捷标记
@@ -87,9 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final app = context.read<AppNotifier>();
     await app.recordDrinkNow();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已记录一杯水 💧')),
-      );
+      showTopToast(context, '已记录一杯水 💧');
       _reload();
     }
   }
@@ -97,9 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openAdd() async {
     final saved = await ReminderFormDialog.show(context);
     if (saved && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('提醒已保存')),
-      );
+      showTopToast(context, '提醒已保存');
       _reload();
     }
   }
@@ -228,19 +225,18 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          // 仅「今天」视图在列表底部展示一键喝水按钮
+          // 仅「今天」视图在列表底部展示一键喝水按钮（定高 50，整合适中）
           if (_isToday)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
               child: SizedBox(
                 width: double.infinity,
+                height: 50,
                 child: FilledButton.icon(
                   onPressed: _recordDrink,
                   icon: const Icon(Icons.water_drop),
-                  label: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text('喝水', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  ),
+                  label: const Text('喝水',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ),
             ),
