@@ -172,9 +172,13 @@ class _StatsScreenState extends State<StatsScreen> {
             if (_loading)
               const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
             else ...[
-              _SummaryCard(counts: _counts, mode: _mode),
-              const SizedBox(height: 16),
-              // 每日喝水统计：柱状/折线合并卡片，右上角切换
+              if (_counts.isEmpty) ...[
+                const _StatsEmpty(),
+                const SizedBox(height: 16),
+              ] else ...[
+                _SummaryCard(counts: _counts, mode: _mode),
+                const SizedBox(height: 16),
+                // 每日喝水统计：柱状/折线合并卡片，右上角切换
               Card(
                 child: Column(
                   children: [
@@ -238,6 +242,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   ],
                 ),
               ),
+              ],
               const SizedBox(height: 16),
               Text('日历', style: _sectionStyle()),
               const SizedBox(height: 8),
@@ -282,6 +287,40 @@ class _SummaryCard extends StatelessWidget {
           children: [
             _StatItem(label: label, value: '$total 次'),
             _StatItem(label: '单日最高', value: '$maxDay 次'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatsEmpty extends StatelessWidget {
+  const _StatsEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.bar_chart, size: 30, color: color),
+            ),
+            const SizedBox(height: 12),
+            const Text('暂无喝水数据',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            const Text('在首页记录一杯水后，这里会展示统计',
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
       ),
@@ -640,7 +679,8 @@ class _DayDetailSheet extends StatelessWidget {
             if (entries.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: Text('当天暂无喝水信息', style: TextStyle(color: Colors.grey))),
+                child: Center(
+                    child: Text('暂无历史喝水记录', style: TextStyle(color: Colors.grey))),
               )
             else
               ...entries.map((e) {

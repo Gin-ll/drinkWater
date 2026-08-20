@@ -109,6 +109,18 @@ void main() {
   });
 
   group('统计聚合 drankCountsByDay', () {
+    test('统计仅基于 DrinkLog，与提醒数量无关（P0-08）', () async {
+      // 2 条提醒配置
+      await addDailyReminder(hour: 8, minute: 0);
+      await addDailyReminder(hour: 18, minute: 0);
+      // 但只有 1 条实际喝水记录（手动）
+      await db.insertDrinkLog(
+          reminderId: null, actionTime: DateTime(2026, 8, 20, 9, 0), occurDate: '2026-08-20', isDrank: true);
+      final counts = await db.drankCountsByDay('2026-08-20', '2026-08-21');
+      // 提醒数量 ≠ 喝水次数：只有 1 次
+      expect(counts['2026-08-20'], 1);
+    });
+
     test('按归属日期分组、开区间过滤', () async {
       final rid = await addDailyReminder();
       await db.insertDrinkLog(reminderId: rid, actionTime: DateTime(2026, 8, 19, 10, 0, 0, 1), occurDate: '2026-08-19', isDrank: true);

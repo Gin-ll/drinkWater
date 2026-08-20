@@ -99,6 +99,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
+  AppLifecycleListener? _lifecycle;
 
   @override
   void initState() {
@@ -107,6 +108,18 @@ class _AppShellState extends State<AppShell> {
     NotificationService.onOpenHome = (_) {
       if (mounted && _index != 0) setState(() => _index = 0);
     };
+    // P0-07：回到前台时校准调度（用户改系统时间/时区后，按新本地时间重算当天闹钟）
+    _lifecycle = AppLifecycleListener(
+      onResume: () {
+        if (mounted) context.read<AppNotifier>().recalibrate();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle?.dispose();
+    super.dispose();
   }
 
   @override
