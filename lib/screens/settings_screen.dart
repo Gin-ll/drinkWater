@@ -56,29 +56,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           _sectionTitle('外观'),
           Card(
-            child: ListTile(
-              leading: const Icon(Icons.palette_outlined),
-              title: const Text('主题色'),
-              trailing: SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: themeColorBlue,
-                    label: Text('蓝色'),
-                    icon: Icon(Icons.circle, size: 14, color: Color(0xFF5B8DEF)),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.palette_outlined, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 12),
+                      const Text('主题色'),
+                    ],
                   ),
-                  ButtonSegment(
-                    value: themeColorGreen,
-                    label: Text('绿色'),
-                    icon: Icon(Icons.circle, size: 14, color: Color(0xFF4BBC8C)),
-                  ),
-                  ButtonSegment(
-                    value: themeColorYellow,
-                    label: Text('黄色'),
-                    icon: Icon(Icons.circle, size: 14, color: Color(0xFFFFC457)),
+                  const SizedBox(height: 12),
+                  // 切换按钮整行放置，避免标题换行
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<String>(
+                      style: const ButtonStyle(
+                        visualDensity: VisualDensity.standard,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      segments: const [
+                        ButtonSegment(
+                          value: themeColorBlue,
+                          label: Text('蓝色'),
+                          icon: Icon(Icons.circle, size: 14, color: Color(0xFF5B8DEF)),
+                        ),
+                        ButtonSegment(
+                          value: themeColorGreen,
+                          label: Text('绿色'),
+                          icon: Icon(Icons.circle, size: 14, color: Color(0xFF4BBC8C)),
+                        ),
+                        ButtonSegment(
+                          value: themeColorYellow,
+                          label: Text('黄色'),
+                          icon: Icon(Icons.circle, size: 14, color: Color(0xFFFFC457)),
+                        ),
+                      ],
+                      selected: {app.themeColor},
+                      onSelectionChanged: (s) => app.setThemeColor(s.first),
+                    ),
                   ),
                 ],
-                selected: {app.themeColor},
-                onSelectionChanged: (s) => app.setThemeColor(s.first),
               ),
             ),
           ),
