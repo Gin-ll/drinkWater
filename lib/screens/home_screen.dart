@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
 
 import '../data/app_database.dart';
@@ -182,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemCount: entries.length,
                     itemBuilder: (context, i) {
                       final e = entries[i];
-                      return _TimelineTile(
+                      final tile = _TimelineTile(
                         entry: e,
                         occurDate: toDateString(_day),
                         onTap: () {
@@ -192,7 +193,34 @@ class _HomeScreenState extends State<HomeScreen> {
                             _openEdit(e.reminder!);
                           }
                         },
-                        onLongPress: e.manual ? null : () => _confirmDelete(e.reminder!),
+                      );
+                      // 左滑滑出「编辑/删除」图标操作（手动喝水记录走点按编辑弹窗）
+                      if (e.manual) return tile;
+                      return Slidable(
+                        key: ValueKey('tile-${e.reminder!.id}-${e.time.millisecondsSinceEpoch}'),
+                        endActionPane: ActionPane(
+                          motion: const DrawerMotion(),
+                          extentRatio: 0.3,
+                          children: [
+                            SlidableAction(
+                              onPressed: (_) => _openEdit(e.reminder!),
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              icon: Icons.edit,
+                              label: '编辑',
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            SlidableAction(
+                              onPressed: (_) => _confirmDelete(e.reminder!),
+                              backgroundColor: const Color(0xFFE5484D),
+                              foregroundColor: Colors.white,
+                              icon: Icons.delete_outline,
+                              label: '删除',
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ],
+                        ),
+                        child: tile,
                       );
                     },
                   );
@@ -303,13 +331,11 @@ class _TimelineTile extends StatelessWidget {
   final TodayEntry entry;
   final String occurDate;
   final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
 
   const _TimelineTile({
     required this.entry,
     required this.occurDate,
     this.onTap,
-    this.onLongPress,
   });
 
   @override
@@ -342,7 +368,6 @@ class _TimelineTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
         onTap: onTap,
-        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(16),
         // IntrinsicHeight 保证竖直时间线（Column 内的 Expanded）有界，避免 ListView 无界高度报错
         child: IntrinsicHeight(
@@ -395,23 +420,20 @@ class _TimelineTile extends StatelessWidget {
                             ],
                           ),
                           // 需求：卡片只保留 标题 + 状态（左侧另有时间）；无副标题行
-                          // 未喝水（含未来待提醒）时才展示唯一动作「已喝」；已喝水/手动记录不展示动作
+                          // 未喝水（含未来待提醒）时展示一个「已喝」图标；已喝水/手动记录不展示
                           if (!entry.manual && !drank) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                _ActionButton(
-                                  label: '已喝',
-                                  icon: Icons.water_drop,
-                                  color: Colors.green,
-                                  onPressed: () => app.mark(
-                                    reminderId: entry.reminder!.id,
-                                    isDrank: true,
-                                    occurDate: occurDate,
-                                  ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
+                                tooltip: '标记已喝',
+                                iconSize: 28,
+                                onPressed: () => app.mark(
+                                  reminderId: entry.reminder!.id,
+                                  isDrank: true,
+                                  occurDate: occurDate,
                                 ),
-                              ],
+                                icon: const Icon(Icons.water_drop, color: Colors.green),
+                              ),
                             ),
                           ],
                         ],
@@ -459,30 +481,6 @@ class _StatusChip extends StatelessWidget {
           Text(text, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
         ],
       ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onPressed;
-
-  const _ActionButton({required this.label, required this.icon, required this.color, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        side: BorderSide(color: color.withValues(alpha: 0.5)),
-      ),
-      onPressed: onPressed,
-      icon: Icon(icon, size: 14),
-      label: Text(label),
     );
   }
 }

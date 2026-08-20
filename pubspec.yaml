@@ -48,6 +48,7 @@ dependencies:
   # 全中文界面：提供 Material 组件（日期/时间选择器等）的中文本地化
   flutter_localizations:
     sdk: flutter
+  flutter_slidable: ^4.0.3
 dev_dependencies:
   flutter_test:
     sdk: flutter
