@@ -15,14 +15,14 @@ class StatsScreen extends StatefulWidget {
   State<StatsScreen> createState() => _StatsScreenState();
 }
 
-enum _RangeMode { week, month, year }
+enum _RangeMode { week, month }
 
 enum _ChartKind { bar, line }
 
 class _StatsScreenState extends State<StatsScreen> {
-  _RangeMode _mode = _RangeMode.week; // 默认本周（年视图从今年起）
+  _RangeMode _mode = _RangeMode.week; // 默认本周
   _ChartKind _chart = _ChartKind.bar;
-  DateTime _anchor = DateTime.now(); // 周=该周任一日期 / 月=某月 / 年=某年
+  DateTime _anchor = DateTime.now(); // 周=该周任一日期 / 月=某月
   Map<String, int> _counts = {};
   bool _loading = true;
 
@@ -31,8 +31,6 @@ class _StatsScreenState extends State<StatsScreen> {
     super.initState();
     _load();
   }
-
-  bool get _isYear => _mode == _RangeMode.year;
 
   /// 当前统计区间（开区间 end 为区间后一天）
   (DateTime, DateTime) get _range {
@@ -45,8 +43,6 @@ class _StatsScreenState extends State<StatsScreen> {
           DateTime(_anchor.year, _anchor.month, 1),
           DateTime(_anchor.year, _anchor.month + 1, 1),
         );
-      case _RangeMode.year:
-        return (DateTime(_anchor.year, 1, 1), DateTime(_anchor.year + 1, 1, 1));
     }
   }
 
@@ -65,7 +61,6 @@ class _StatsScreenState extends State<StatsScreen> {
       // 周：只显示第几周，不需要范围
       _RangeMode.week => '第${_isoWeekNumber(start)}周',
       _RangeMode.month => '${_anchor.year}年${_anchor.month}月',
-      _RangeMode.year => '${_anchor.year}年',
     };
   }
 
@@ -94,7 +89,6 @@ class _StatsScreenState extends State<StatsScreen> {
       _anchor = switch (_mode) {
         _RangeMode.week => _anchor.add(Duration(days: 7 * step)),
         _RangeMode.month => DateTime(_anchor.year, _anchor.month + step, 1),
-        _RangeMode.year => DateTime(_anchor.year + step, 1, 1),
       };
     });
     _load();
@@ -126,7 +120,6 @@ class _StatsScreenState extends State<StatsScreen> {
                   segments: const [
                     ButtonSegment(value: _RangeMode.week, label: Text('周')),
                     ButtonSegment(value: _RangeMode.month, label: Text('月')),
-                    ButtonSegment(value: _RangeMode.year, label: Text('年')),
                   ],
                   selected: {_mode},
                   onSelectionChanged: (s) {
@@ -198,9 +191,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     LayoutBuilder(
                       builder: (context, cons) {
                         final days = _days;
-                        final cellWidth = _isYear
-                            ? 14.0
-                            : (_mode == _RangeMode.month ? 36.0 : 20.0);
+                        final cellWidth = _mode == _RangeMode.month ? 36.0 : 20.0;
                         final totalWidth = (days.length * cellWidth)
                             .clamp(cons.maxWidth - 32, double.infinity)
                             .toDouble();
@@ -215,7 +206,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                   ? _BarChart(
                                       counts: _counts,
                                       days: days,
-                                      barWidth: _isYear ? 4 : 10,
+                                      barWidth: 10,
                                       mode: _mode,
                                     )
                                   : _LineChart(
@@ -234,10 +225,11 @@ class _StatsScreenState extends State<StatsScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text('日历（点击查看当天明细）', style: _sectionStyle()),
+              Text('日历', style: _sectionStyle()),
               const SizedBox(height: 8),
               _CalendarCard(
                 anchor: _anchor,
+                mode: _mode,
                 counts: _counts,
                 onTapDay: (date) => _showDayDetail(toDateString(date)),
               ),
@@ -267,7 +259,6 @@ class _SummaryCard extends StatelessWidget {
     final label = switch (mode) {
       _RangeMode.week => '本周喝水',
       _RangeMode.month => '本月喝水',
-      _RangeMode.year => '本年喝水',
     };
     return Card(
       child: Padding(
@@ -303,12 +294,11 @@ class _StatItem extends StatelessWidget {
   }
 }
 
-/// X 轴刻度文案：周=周一~周日，月=几号，年=月份
+/// X 轴刻度文案：周=周一~周日，月=几号
 String _xAxisLabel(DateTime d, _RangeMode mode) {
   return switch (mode) {
     _RangeMode.week => weekNames[d.weekday - 1],
     _RangeMode.month => '${d.day}',
-    _RangeMode.year => '${d.month}月',
   };
 }
 
@@ -319,8 +309,6 @@ bool _shouldShowX(DateTime d, _RangeMode mode) {
       return true; // 周一~周日全显示
     case _RangeMode.month:
       return true; // 几号几号（图表可横向滚动）
-    case _RangeMode.year:
-      return d.day == 1; // 每年只标各月份
   }
 }
 
@@ -328,9 +316,7 @@ bool _shouldShowX(DateTime d, _RangeMode mode) {
 String _tooltipLabel(DateTime d, _RangeMode mode) {
   if (mode == _RangeMode.week) return weekNames[d.weekday - 1];
   return '${d.month}月${d.day}日';
-}
-
-class _BarChart extends StatelessWidget {
+}class _BarChart extends StatelessWidget {
   final Map<String, int> counts;
   final List<DateTime> days;
   final double barWidth;
@@ -498,14 +484,55 @@ class _LineChart extends StatelessWidget {
 
 class _CalendarCard extends StatelessWidget {
   final DateTime anchor;
+  final _RangeMode mode;
   final Map<String, int> counts;
   final ValueChanged<DateTime> onTapDay;
 
-  const _CalendarCard({required this.anchor, required this.counts, required this.onTapDay});
+  const _CalendarCard({
+    required this.anchor,
+    required this.mode,
+    required this.counts,
+    required this.onTapDay,
+  });
 
   @override
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme.primary;
+
+    // 周视图：只展示当周 7 天
+    if (mode == _RangeMode.week) {
+      final weekStart = anchor.subtract(Duration(days: anchor.weekday - 1));
+      final cells = <Widget>[
+        for (var i = 0; i < 7; i++) _dayCell(weekStart.add(Duration(days: i)), color),
+      ];
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  for (final w in weekNames)
+                    Expanded(
+                        child: Center(
+                            child:
+                                Text(w, style: const TextStyle(fontSize: 12, color: Colors.grey)))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              GridView.count(
+                crossAxisCount: 7,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: cells,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 月视图：整月
     final first = DateTime(anchor.year, anchor.month, 1);
     final daysInMonth = DateTime(anchor.year, anchor.month + 1, 0).day;
     final leadingBlanks = first.weekday - 1; // 周一开头
@@ -514,32 +541,7 @@ class _CalendarCard extends StatelessWidget {
       cells.add(const SizedBox.shrink());
     }
     for (var d = 1; d <= daysInMonth; d++) {
-      final date = DateTime(anchor.year, anchor.month, d);
-      final cnt = counts[toDateString(date)] ?? 0;
-      cells.add(
-        InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => onTapDay(date),
-          child: Container(
-            alignment: Alignment.center,
-            margin: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              color: cnt == 0
-                  ? Colors.transparent
-                  : color.withValues(alpha: (0.12 + 0.18 * (cnt.clamp(0, 4) / 4)).toDouble()),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('$d', style: const TextStyle(fontSize: 12)),
-                Text(cnt > 0 ? '$cnt' : '',
-                    style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-        ),
-      );
+      cells.add(_dayCell(DateTime(anchor.year, anchor.month, d), color));
     }
     return Card(
       child: Padding(
@@ -568,6 +570,32 @@ class _CalendarCard extends StatelessWidget {
                 const Text('次数越多颜色越深', style: TextStyle(fontSize: 11, color: Colors.grey)),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dayCell(DateTime date, Color color) {
+    final cnt = counts[toDateString(date)] ?? 0;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => onTapDay(date),
+      child: Container(
+        alignment: Alignment.center,
+        margin: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: cnt == 0
+              ? Colors.transparent
+              : color.withValues(alpha: (0.12 + 0.18 * (cnt.clamp(0, 4) / 4)).toDouble()),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('${date.day}', style: const TextStyle(fontSize: 12)),
+            Text(cnt > 0 ? '$cnt' : '',
+                style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
